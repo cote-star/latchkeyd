@@ -1,197 +1,113 @@
 # latchkeyd
 
-`latchkeyd` is a local secret broker and trust gate for agent-driven developer workflows.
+Local trust gate and secret broker for agent-driven developer workflows.
 
-It lets agents use real tools without turning your shell into a generic credential vending machine.
+`latchkeyd` helps local agents use real tools without turning your shell into a generic credential vending machine.
 
-## Current Status
+![latchkeyd hero](docs/assets/hero.svg)
 
-`latchkeyd` is a working public alpha for macOS-first local brokered workflows.
+## Why this exists
+
+Local coding agents become risky when they start improvising with:
+
+- direct token use
+- raw API calls
+- ad-hoc CLI discovery
+- broad environment inheritance
+- fallback auth paths
+- remote content steering local tools into unsafe execution
+
+Most local setups force a bad choice:
+
+- give the agent too little access and it stops being useful
+- give it broad local access and it becomes hard to trust
+
+`latchkeyd` is aimed at the middle.
+
+It keeps secrets local, pins trust to approved wrappers and binaries, and releases only the exact secret handoff required for an approved local action.
+
+## What it is
+
+`latchkeyd` is a macOS-first local broker for secret-scoped tool execution.
+
+It verifies:
+
+- the wrapper asking for access
+- the downstream binary that would receive access
+- the manifest policy that allows that handoff
+
+Then it injects only the named environment variables approved for that exact action and `exec`s the trusted command.
+
+## What makes it different
+
+- local-first: no cloud control plane required
+- your system, your rules: trust is defined by the local manifest you control
+- explicit secret handoff: there is no generic "fetch me any secret" API
+- trust-pinned execution: both wrapper and binary are verified
+- fail closed on drift: path changes, hash changes, and hijacks stop the run
+- built for agent workflows: this is about safer local tool use, not generic app configuration
+
+## Current status
+
+`latchkeyd` is a working public alpha.
 
 Current alpha scope:
 
 - SwiftPM package with a real `latchkeyd` CLI
-- trust manifest init, refresh, verify, and validation commands
-- two secret backends: `file` and `keychain`
-- one end-to-end example wrapper and harmless demo CLI
-- JSONL event logging and GitHub Actions build/release workflows
+- manifest init, refresh, verify, and validate commands
+- `file` and `keychain` secret backends
+- a reference Bash wrapper plus a harmless demo CLI
+- JSONL event logging
+- GitHub Actions CI and release workflows
 
-Still intentionally out of scope for this alpha:
+Intentional non-goals for this alpha:
 
 - long-running daemon mode
-- HTTP-specific broker commands
 - provider-specific integrations
-- cross-platform secret backends
-- code signing and notarization
+- HTTP-specific broker commands
+- cross-platform backends
+- signing and notarization
 
-## Why this exists
+## Why local-first matters
 
-Local agentic development is useful right up until the model starts improvising with:
+If the safety story depends on a cloud broker, remote policy service, or hosted execution boundary, the user no longer owns the full trust root.
 
-- raw API calls
-- browser-first auth flows
-- direct token usage
-- ad-hoc CLI discovery
-- credential probing through config and env state
+`latchkeyd` takes a different position:
 
-Most local setups have the same gap: either the agent gets too little access to be useful, or too much access to be safe.
+- the trust root is local
+- the secret store is local
+- the handoff policy is local
+- the operator can inspect the actual trusted paths and hashes
 
-`latchkeyd` is aimed at the middle:
+That makes the system easier to reason about for a single-user workstation and reduces reliance on cloud-side assumptions.
 
-- secrets stay in the OS key store
-- trusted callers are verified before secret release
-- tool execution is mediated through explicit policy
-- read-only and bounded operations are easy to support
-- local workflows stay fast and scriptable
+## How this helps with prompt-injection fallout
 
-## Project Positioning
+Prompt injection is not something a local broker can "solve" universally.
 
-`latchkeyd` is not:
+What `latchkeyd` does is narrow the blast radius once an agent is already allowed to run local tools:
 
-- a sandbox
-- a container runtime
-- malware protection
-- a replacement for OS isolation
-- a universal policy engine
+- remote content cannot directly get secrets just by influencing model output
+- wrappers can remain small, explicit, and purpose-built
+- broad inherited env state is replaced with explicit handoff
+- a tool name alone is not trusted; the real path and hash must match
 
-`latchkeyd` is:
+This is defense in depth for approved local workflows, not a blanket claim of secure agents.
 
-- a local broker for secret-scoped tool execution
-- a trust-pinning layer for agent wrappers and approved CLIs
-- a practical guardrail for single-user agentic development workstations
-
-## Who It Is For
-
-- engineers using local coding agents with real company or personal credentials
-- advanced individual developers who want safer local automation
-- teams building internal agent tooling on top of existing CLIs and API wrappers
-
-## Core Idea
-
-An agent should not get direct access to long-lived credentials just because it can run shell commands.
-
-Instead:
+## How it works
 
 1. The agent calls a wrapper.
-2. The wrapper proves context and intent.
-3. `latchkeyd` verifies the calling path and the target executable.
-4. `latchkeyd` releases only the secret needed for that exact approved action.
-5. The tool runs and returns output without exposing the general credential surface.
+2. The wrapper normalizes the request and calls `latchkeyd`.
+3. `latchkeyd` verifies the trusted wrapper path and hash.
+4. `latchkeyd` verifies the trusted downstream binary path and hash.
+5. `latchkeyd` resolves only the secret entries approved by policy.
+6. `latchkeyd` injects only the approved environment variables and `exec`s the command.
 
-## Product Shape
+![Architecture flow](docs/assets/architecture-flow.svg)
 
-Planned capabilities:
+## Five-minute quickstart
 
-- local secret broker with small, explicit command surface
-- trust manifest for approved wrappers and executables
-- path and hash pinning for downstream CLIs
-- provider-style `exec` mode for running approved tools with injected credentials
-- policy-friendly integration for read-only wrappers and bounded API access
-- local audit logging hooks
-- compact validation command for workstation integrity checks
-
-## Distribution Model
-
-`latchkeyd` should be treated as a Swift-native project, not a registry package project.
-
-Planned public distribution paths:
-
-- source distribution via GitHub and Swift Package Manager
-- signed release binaries attached to GitHub Releases
-- Homebrew formula or tap later for install convenience
-
-Planned non-goals for the broker itself:
-
-- publishing the core broker to npm
-- publishing the core broker to crates.io
-- publishing the core broker to PyPI
-
-Those registries may still matter for example wrappers, demos, or companion tooling in other languages, but they are not the primary release path for the broker core.
-
-## Design Principles
-
-- Boring over magical
-- Fail closed
-- Keep trust boundaries obvious
-- Prefer small contracts over flexible abstractions
-- Make the secure path the shortest path
-- Support real developer workflows without pretending to be a full sandbox
-
-## Non-Goals
-
-- fully preventing a malicious same-user process
-- replacing macOS Keychain, 1Password, or enterprise secret managers
-- securing arbitrary browser sessions
-- allowing unrestricted generic shell access with secrets in scope
-- solving multi-user workstation isolation
-
-## Differentiators
-
-- built for local agent workflows, not generic app secret injection
-- trust-pins both wrappers and underlying CLIs
-- optimized for workstation ergonomics, not only enterprise platforms
-- designed to pair with wrapper-first tooling rather than replace it
-
-## Initial Open Source Scope
-
-Ship first:
-
-- broker core
-- trust manifest tooling
-- example wrapper integration
-- validation tooling
-- reference docs and threat model
-- SwiftPM package definition and local build story
-- GitHub Release distribution plan for signed binaries
-
-Do not ship first:
-
-- personal workstation conventions
-- employer-specific connectors
-- organization-specific policies
-- personal work/play routing assumptions
-- package-registry publishing paths that do not match the Swift broker core
-
-## How To Read This Repo
-
-Start here:
-
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the system shape
-- [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the security framing
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) for the implementation sequence
-- [`docs/OSS_EXTRACTION_PLAN.md`](docs/OSS_EXTRACTION_PLAN.md) for what is generic versus workstation-specific
-- [`examples/wrapper-contract.md`](examples/wrapper-contract.md) for the wrapper-facing contract
-
-If you are evaluating whether the repo is worth following, the key question is simple:
-
-can a small local broker make agent workflows safer without becoming a giant policy platform?
-
-That is the problem this project is trying to answer.
-
-## CLI Surface
-
-The current alpha ships these broker commands:
-
-- `latchkeyd status`
-- `latchkeyd manifest init`
-- `latchkeyd manifest refresh`
-- `latchkeyd manifest verify`
-- `latchkeyd exec`
-- `latchkeyd validate`
-
-The default manifest path is:
-
-- `~/Library/Application Support/latchkeyd/manifest.json`
-
-The default event log path is:
-
-- `~/Library/Application Support/latchkeyd/events.jsonl`
-
-Use `--manifest PATH` to override the manifest location.
-
-## Build And Quickstart
-
-Build locally:
+Build:
 
 ```bash
 swift build
@@ -204,81 +120,137 @@ Initialize the example manifest:
 ./.build/debug/latchkeyd manifest refresh
 ```
 
-Run the example wrapper demo:
+Run the example wrapper:
 
 ```bash
 LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper demo
 ```
 
-Run the compact validation pass:
+Validate the setup:
 
 ```bash
 LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./.build/debug/latchkeyd validate
 ```
 
-What the example setup uses:
+The example setup uses:
 
-- the `file` backend with [`examples/file-backend/demo-secrets.json`](examples/file-backend/demo-secrets.json)
-- the reference wrapper at [`examples/bin/example-wrapper`](examples/bin/example-wrapper)
-- the harmless demo CLI at [`examples/bin/example-demo-cli`](examples/bin/example-demo-cli)
+- [`examples/bin/example-wrapper`](examples/bin/example-wrapper)
+- [`examples/bin/example-demo-cli`](examples/bin/example-demo-cli)
+- [`examples/file-backend/demo-secrets.json`](examples/file-backend/demo-secrets.json)
 
-For real workstation use, the intended backend is `keychain`. The file backend exists to make demos, tests, CI, and first-run evaluation easy.
+For real workstation use, the intended backend is `keychain`. The `file` backend exists to make demos, tests, CI, and first-run evaluation easy.
 
-## Denial Cases
+## Demo package
+
+The repo now includes a public demo package:
+
+- [`docs/demos/HAPPY_PATH.md`](docs/demos/HAPPY_PATH.md) for the fast success walkthrough
+- [`docs/demos/TRUST_FAILURES.md`](docs/demos/TRUST_FAILURES.md) for reproducible trust denials
+
+Happy-path preview:
+
+![Happy path terminal](docs/assets/terminal-happy-path.svg)
+
+## What success looks like
+
+On the happy path:
+
+- the wrapper succeeds
+- the broker verifies both trust boundaries
+- the trusted binary receives only the approved secret env var
+- no raw secret is printed
+- the event log records the action without logging secret material
+
+## Trust failures you should expect
 
 The alpha is meant to make trust failure obvious and reproducible.
 
-Examples you can trigger:
+Examples:
 
-- edit the example wrapper and run `latchkeyd manifest verify` before refresh to see hash drift denial
+- edit the example wrapper and run `latchkeyd manifest verify` before refresh to see wrapper drift denial
 - prepend a fake `example-demo-cli` earlier in `PATH` to trigger PATH hijack denial
 - call `latchkeyd exec` directly with an untrusted `--caller` path to trigger caller denial
 - point the file backend at a missing file to trigger backend configuration denial
 
-## Proposed Repo Layout
+Denial preview:
 
-```text
-latchkeyd/
-  README.md
-  docs/
-    ARCHITECTURE.md
-    THREAT_MODEL.md
-    ROADMAP.md
-    OSS_EXTRACTION_PLAN.md
-    REPO_STORY.md
-  examples/
-    example-manifest.json
-    wrapper-contract.md
-  src/
-  tests/
-```
+![Trust denial terminal](docs/assets/terminal-denial.svg)
 
-## Name Rationale
+## Operator recovery path
 
-`latchkeyd` suggests a local key-holder that opens only the right door for the right caller.
+When trust checks fail, the intended operator loop is simple:
 
-It is distinctive, short, and naturally maps to a small broker daemon or broker-style utility without sounding like another generic "agent bridge" package.
+1. inspect the failing wrapper, binary, or backend path
+2. decide whether the change is expected
+3. if it is expected, re-pin with `latchkeyd manifest refresh`
+4. if it is not expected, stop and investigate instead of weakening the policy
 
-## V1 Demo Story
+The secure path should be the shortest path, but it should never silently self-heal.
 
-A strong first public demo should show:
+## Public command surface
 
-1. A local agent tries to use a trusted wrapper.
-2. The wrapper invokes `latchkeyd`.
-3. The broker verifies trust and launches the approved CLI with the minimum secret scope.
-4. A path-hijack or untrusted caller attempt fails closed.
-5. Validation proves the workstation is still in a good state.
+- `latchkeyd status`
+- `latchkeyd manifest init`
+- `latchkeyd manifest refresh`
+- `latchkeyd manifest verify`
+- `latchkeyd exec`
+- `latchkeyd validate`
 
-That demo now exists in the repository example flow and is the baseline that future provider- or connector-style wrappers should build on.
+Default manifest path:
 
-## Contributing
+- `~/Library/Application Support/latchkeyd/manifest.json`
 
-Discussion and design feedback are welcome early.
+Default event log path:
 
-Implementation contributions will be most useful once the first Swift package layout and broker skeleton are in place.
+- `~/Library/Application Support/latchkeyd/events.jsonl`
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`SECURITY.md`](SECURITY.md).
+Use `--manifest PATH` to override the manifest location.
 
-## License
+## Who this is for
 
-MIT. See [`LICENSE`](LICENSE).
+- engineers using local coding agents with real credentials
+- advanced developers building wrapper-first local automations
+- teams exploring safer trust boundaries for internal agent tooling
+
+## What it does not claim to solve
+
+- same-user full compromise
+- browser or session-store compromise
+- generic endpoint policy for every API
+- OS-level isolation
+- "secure agents solved"
+
+This project should be understood as local defense in depth for approved workflows.
+
+## Repository guide
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the system shape
+- [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the security framing
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) for implementation sequence
+- [`examples/wrapper-contract.md`](examples/wrapper-contract.md) for wrapper-facing expectations
+
+## Release shape
+
+The broker core is a Swift command-line tool.
+
+Current distribution shape:
+
+- source build via Swift Package Manager
+- GitHub Actions workflows for CI and tagged releases
+- release binaries and checksums from GitHub Releases once tags are cut
+
+Later possibilities:
+
+- Homebrew distribution
+- signed and notarized binaries
+- broader wrapper ecosystem
+
+## Project support
+
+- [`CHANGELOG.md`](CHANGELOG.md) tracks release-facing changes
+- [`docs/RELEASE_RUNBOOK.md`](docs/RELEASE_RUNBOOK.md) documents the release process
+- [`docs/ANNOUNCEMENT_DRAFT.md`](docs/ANNOUNCEMENT_DRAFT.md) holds launch copy to refine before public release
+
+## One-line summary
+
+`latchkeyd` gives local agents a narrower, auditable, fail-closed way to use real tools with real credentials.

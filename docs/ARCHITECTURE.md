@@ -4,103 +4,36 @@
 
 Provide a reusable local secret broker for agent-mediated tool execution on a single-user machine.
 
-The architecture should be simple enough to audit and narrow enough to trust.
+The system should stay small enough to audit, narrow enough to trust, and practical enough to use in real local workflows.
 
-## High-Level Components
+## Implemented alpha shape
 
-### 1. Broker
+The current public alpha ships as a single-shot Swift CLI, not a long-running daemon.
+
+That is an intentional product boundary for now:
+
+- one executable
+- one manifest-driven trust model
+- one brokered exec path
+- one validation path
+
+The internal shape is still broker-oriented so later daemonization does not require changing the trust model.
+
+## High-level components
+
+### 1. Broker core
 
 Responsibilities:
 
-- receive a narrow set of subcommands
-- resolve secret identifiers to OS-backed secret storage
-- verify trusted caller identity
+- expose a narrow command surface
+- load the trust manifest
+- resolve the selected secret backend
+- verify trusted wrapper identity
 - verify trusted downstream executable identity
-- exec the approved command with minimal credential exposure
+- inject only approved secret env vars
+- launch the approved command
 
-Desirable implementation traits:
-
-- compiled implementation for the broker core
-- Swift-first implementation is a good fit for the broker core
-- explicit subcommands instead of dynamic behavior
-- no generic “get any secret” API
-
-### 2. Trust Manifest
-
-Responsibilities:
-
-- record approved caller paths
-- record approved executable paths
-- record expected hashes
-- support refresh and status verification
-
-Requirements:
-
-- canonical paths only
-- cryptographic hash pinning
-- human-readable format
-- fail-closed verification
-
-### 3. Wrappers
-
-Responsibilities:
-
-- normalize task input
-- enforce context and policy before broker access
-- keep command surfaces small and discoverable
-- make approved behavior easier than improvised behavior
-
-Wrapper contract:
-
-- `--health`
-- `--whoami`
-- `--version`
-- `--discover`
-- structured success and error JSON
-
-### 4. Validation Layer
-
-Responsibilities:
-
-- verify trusted binaries and scripts are present
-- verify boundary enforcement works
-- verify path hijacks are rejected
-- verify logs and docs still match the actual behavior
-
-### 5. Observability
-
-Responsibilities:
-
-- emit local structured events
-- support operational queries
-- help detect blocked, denied, or drifted states
-
-## Control Flow
-
-### Trusted exec path
-
-1. Agent invokes a wrapper.
-2. Wrapper validates context and request shape.
-3. Wrapper resolves the intended tool and calls the broker.
-4. Broker verifies:
-   - broker integrity
-   - trusted caller path and hash
-   - trusted downstream executable path and hash
-   - allowed subcommand shape
-5. Broker injects only the needed credential material.
-6. Broker `exec`s the approved command.
-
-### Failure path
-
-If any trust or policy check fails:
-
-- return a structured error
-- do not fall back to a weaker access path
-- do not release the secret
-
-## Reference V1 Interfaces
-
-### Broker commands
+Current alpha command surface:
 
 - `status`
 - `manifest init`
@@ -109,20 +42,30 @@ If any trust or policy check fails:
 - `exec`
 - `validate`
 
-V1 should stay intentionally small.
+Important limits:
 
-## Build And Distribution Shape
+- no generic secret fetch command
+- no provider-specific logic in core
+- no browser/session automation logic
 
-The broker core should be treated as a Swift command-line tool with a release flow that matches Swift ecosystems:
+### 2. Trust manifest
 
-- source consumption through Swift Package Manager
-- local builds via `swift build`
-- installable release artifacts produced from tagged builds
-- optional Homebrew distribution later for ergonomic install/update
+Responsibilities:
 
-That means the architecture should not assume language-package-registry publication for the broker itself. Registry publishing may still be appropriate for companion tooling or demo integrations, but the broker core should optimize for SwiftPM and release binaries.
+- record trusted wrapper paths and hashes
+- record trusted binary paths and hashes
+- define the selected secret backend
+- define named secret entries
+- define exec policies mapping wrapper -> binary -> secrets
 
-### Example manifest shape
+Requirements:
+
+- canonical path storage
+- cryptographic hash pinning
+- fail-closed verification
+- human-editable format
+
+Current alpha manifest fields:
 
 ```json
 {
@@ -160,29 +103,118 @@ That means the architecture should not assume language-package-registry publicat
 }
 ```
 
-## Portability Strategy
+### 3. Secret backends
 
-V1 can be macOS-first because OS key store integration is a major part of the value.
+The backend interface is intentionally small:
 
-Cross-platform can come later with pluggable secret backends:
+- availability check
+- resolve named secret
 
-- macOS Keychain first
-- Linux Secret Service later
-- Windows Credential Manager later
+Current alpha backends:
 
-## What To Keep Out Of Core
+- `file` for demos, tests, CI, and first-run evaluation
+- `keychain` for real macOS local use
+
+The `file` backend is convenience infrastructure, not the preferred long-term workstation posture.
+
+### 4. Wrappers
+
+Responsibilities:
+
+- normalize user or agent input
+- keep the allowed command surface small and discoverable
+- fail closed on unknown operations
+- call `latchkeyd exec` instead of resolving secrets themselves
+
+Reference wrapper contract:
+
+- `--health`
+- `--whoami`
+- `--version`
+- `--discover`
+- one explicit safe action surface
+
+See [`../examples/wrapper-contract.md`](../examples/wrapper-contract.md).
+
+### 5. Validation and observability
+
+The validation layer exists to prove the expected trust boundary still works.
+
+Current alpha validation checks:
+
+- manifest readability
+- trust entry verification
+- backend availability
+- example wrapper health
+- example wrapper demo success
+- at least one denied-path scenario
+
+Observability in the alpha is local JSONL event logging with no secret values.
+
+## Control flow
+
+### Trusted exec path
+
+1. An agent or user invokes a wrapper.
+2. The wrapper normalizes the request and calls `latchkeyd exec`.
+3. `latchkeyd` loads the manifest and selected backend.
+4. `latchkeyd` verifies the wrapper path and hash.
+5. `latchkeyd` verifies the trusted binary path and hash.
+6. If a `lookupName` is configured, `latchkeyd` resolves it in `PATH` and rejects a mismatch.
+7. `latchkeyd` resolves only the approved named secret entries.
+8. `latchkeyd` injects only the approved env vars and launches the trusted binary.
+9. `latchkeyd` emits a local event without logging secret material.
+
+### Failure path
+
+If any trust, manifest, or backend check fails:
+
+- return a structured error
+- record a denial or failure event
+- do not fall back to weaker behavior
+- do not release the secret
+
+## Operator model
+
+The operator loop is intentionally explicit:
+
+1. initialize the manifest
+2. refresh trust entries when expected local paths change
+3. verify trust state
+4. use wrappers for approved operations
+5. validate the workstation setup after changes
+
+That loop is part of the product. The project is not trying to hide trust decisions behind automatic repair.
+
+## Distribution shape
+
+The broker core is treated as a Swift command-line tool:
+
+- source consumption via Swift Package Manager
+- local builds via `swift build`
+- tagged release artifacts via GitHub Releases
+- optional Homebrew distribution later
+
+The architecture should not assume package-registry publication for the broker core.
+
+## Portability strategy
+
+V1 is macOS-first because local secret-store integration is a core part of the value.
+
+Possible later backends:
+
+- Linux Secret Service
+- Windows Credential Manager
+
+Those are future extensions, not part of the current alpha contract.
+
+## Deliberately out of core
 
 - organization-specific policy
-- repo-specific context models
-- UI/browser automation logic
 - broad connector catalogs
+- UI/browser automation logic
 - generic auth discovery
-- registry-publishing assumptions that do not match the broker language/runtime
+- large policy DSL work
+- cloud control-plane assumptions
 
-The project should expose primitives, reference wrappers, and policy examples, not ship someone else's workstation worldview.
-
-## Current Alpha Notes
-
-- caller trust in the alpha is based on trusted wrapper path and hash, not full same-user process attestation
-- PATH hijack protection is implemented by resolving an expected lookup name and comparing it to the trusted binary path
-- the file backend is a deliberate convenience backend for demos and CI, not the preferred long-term workstation posture
+The repo should expose auditable primitives, reference wrappers, and a clear trust model, not a giant policy platform.
