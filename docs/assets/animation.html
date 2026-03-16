@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Latchkeyd Defense Animation</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: #FDFCF8; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh;
+        }
+        .anim-container {
+            width: 1080px;
+            height: 530px;
+            overflow: hidden;
+            position: relative;
+        }
+        .frame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1080px;
+            height: auto;
+            opacity: 0;
+        }
+        .active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="anim-container">
+        <!-- Frame 1: Before -->
+        <img class="frame active" src="oq0qv.png" alt="Before" />
+        <!-- Frame 2: After -->
+        <img class="frame" src="gxOAw.png" alt="After" />
+    </div>
+
+    <script>
+        const frames = document.querySelectorAll('.frame');
+        let currentFrame = 0;
+
+        function cycle() {
+            // Because there's a quick flash, let's just abruptly switch visibility
+            frames[currentFrame].classList.remove('active');
+            
+            // Move to next frame
+            currentFrame = (currentFrame + 1) % frames.length;
+            
+            // Show new frame
+            frames[currentFrame].classList.add('active');
+        }
+
+        // Cycle every 2 seconds
+        setInterval(cycle, 2000);
+    </script>
+</body>
+</html>

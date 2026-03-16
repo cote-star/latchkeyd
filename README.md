@@ -11,7 +11,7 @@ Let local agents use real tools without turning your shell into a generic creden
 
 > If you use local coding agents with real credentials, `latchkeyd` gives you a narrower, auditable trust gate between wrapper and tool.
 
-![latchkeyd before and after](docs/assets/before-after.gif)
+![latchkeyd before and after](docs/assets/before-after-anim.webp)
 
 ```bash
 LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper demo
@@ -150,6 +150,8 @@ What `latchkeyd` does is narrow the blast radius once an agent is already allowe
 - broad inherited env state is replaced with explicit handoff
 - a tool name alone is not trusted; the real path and hash must match
 
+![latchkeyd attack surface protection](docs/assets/attack-surface-anim.webp?v=2)
+
 This is defense in depth for approved local workflows, not a blanket claim of secure agents.
 
 ## How It Works
@@ -161,7 +163,7 @@ This is defense in depth for approved local workflows, not a blanket claim of se
 5. `latchkeyd` resolves only the secret entries approved by policy.
 6. `latchkeyd` injects only the approved environment variables and `exec`s the command.
 
-![Architecture flow](docs/assets/architecture-flow.svg)
+![Architecture flow](docs/assets/architecture-flow.png?v=2)
 
 **Tenets:**
 
