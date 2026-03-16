@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "wrappers": {
+    "example-wrapper": {
+      "path": "/absolute/path/to/example-wrapper",
+      "sha256": "replace-me"
+    }
+  },
+  "binaries": {
+    "example-cli": {
+      "path": "/absolute/path/to/example-cli",
+      "sha256": "replace-me"
+    }
+  }
+}
