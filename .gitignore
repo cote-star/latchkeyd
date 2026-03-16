@@ -4,6 +4,8 @@ build/
 .env
 .env.*
 *.log
+node_modules/
+__pycache__/
 
 # Xcode
 xcuserdata/

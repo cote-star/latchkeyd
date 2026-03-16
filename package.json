@@ -1,0 +1,11 @@
+{
+  "name": "latchkeyd-demo-assets",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render:demo-assets": "node scripts/render_demo_assets.mjs"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.5.0"
+  }
+}

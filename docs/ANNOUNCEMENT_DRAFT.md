@@ -4,7 +4,11 @@
 
 Open-sourced `latchkeyd`: a local trust gate for agent workflows.
 
-It keeps secrets local, verifies the wrapper and the tool, and fails closed on drift or hijack instead of turning your shell into a generic credential vending machine.
+If you use local coding agents with real credentials, `latchkeyd` gives you a narrower handoff:
+
+- secrets stay local
+- wrappers and binaries are trust-pinned
+- drift, hijack, and bypass fail closed
 
 Repo:
 

@@ -3,10 +3,13 @@
 ![CI Status](https://github.com/cote-star/latchkeyd/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-0.1.0--alpha-green.svg)
+[![Star History](https://img.shields.io/github/stars/cote-star/latchkeyd?style=social)](https://github.com/cote-star/latchkeyd)
 
-Local trust gate and secret broker for agent-driven developer workflows.
+**Keep secrets local. Approve the handoff.**
 
-`latchkeyd` helps local agents use real tools without turning your shell into a generic credential vending machine.
+Let local agents use real tools without turning your shell into a generic credential vending machine.
+
+> If you use local coding agents with real credentials, `latchkeyd` gives you a narrower, auditable trust gate between wrapper and tool.
 
 ![latchkeyd before and after](docs/assets/before-after.gif)
 
@@ -14,7 +17,7 @@ Local trust gate and secret broker for agent-driven developer workflows.
 LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper demo
 ```
 
-## Two risks, one tool
+**Two problems, one tool:**
 
 - **Credential sprawl**: local agents become hard to trust when real credentials leak into broad env state, direct token use, or ad-hoc tool discovery.
 - **Prompt-injection fallout**: remote content can influence an agent to attempt unsafe local actions, especially when the workstation has no explicit handoff boundary.
@@ -28,22 +31,37 @@ LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper demo
 
 ## See It In Action
 
-### The Happy Path
+### The Trusted Handoff
 
 Build, initialize trust, run the wrapper, validate the workstation:
 
-![Happy path terminal](docs/assets/terminal-happy-path.svg)
+![Happy path terminal](docs/assets/terminal-happy-path.webp)
 
-### The Trust Denial
+### The Denied Handoff
 
 Put the wrong binary in `PATH` and the broker rejects it instead of handing over the secret:
 
-![Trust denial terminal](docs/assets/terminal-denial.svg)
+![Trust denial terminal](docs/assets/terminal-denial.webp)
 
 More walkthroughs:
 
 - [`docs/demos/HAPPY_PATH.md`](docs/demos/HAPPY_PATH.md)
 - [`docs/demos/TRUST_FAILURES.md`](docs/demos/TRUST_FAILURES.md)
+
+## What You Get Back
+
+Every broker command returns structured output that is safe to inspect, script, or log:
+
+```json
+{
+  "ok": true,
+  "tool": "example-demo-cli",
+  "tokenPreview": "la***en",
+  "tokenLength": 19
+}
+```
+
+Trusted wrapper, trusted binary, scoped handoff. No raw secret values printed back to the terminal.
 
 ## Quick Start
 
@@ -80,11 +98,18 @@ The example setup uses:
 
 For real workstation use, the intended backend is `keychain`. The `file` backend exists to make demos, tests, CI, and first-run evaluation easy.
 
+## Why This Exists
+
+Most local agent setups end up with one of two bad patterns:
+
+- broad inherited env state that every tool can see
+- wrapper scripts that assume the tool name alone is enough to trust
+
+`latchkeyd` exists to put a local trust check in the middle of that flow.
+
 ## What It Is
 
-`latchkeyd` is a macOS-first local broker for secret-scoped tool execution.
-
-It verifies:
+`latchkeyd` is a macOS-first local broker for secret-scoped tool execution. It verifies:
 
 - the wrapper asking for access
 - the downstream binary that would receive access
@@ -138,6 +163,13 @@ This is defense in depth for approved local workflows, not a blanket claim of se
 
 ![Architecture flow](docs/assets/architecture-flow.svg)
 
+**Tenets:**
+
+- **Local-first**: the trust root, manifest, and secret backend stay on the workstation you control.
+- **Fail-closed**: drift, hijack, and bypass stop the run instead of silently weakening policy.
+- **Wrapper-first**: wrappers stay small and explicit; they do not become secret fetchers.
+- **Operator-readable**: paths, hashes, and event logs are inspectable without a cloud control plane.
+
 ## Trust Failures You Should Expect
 
 The alpha is meant to make trust failure obvious and reproducible.
@@ -159,6 +191,17 @@ When trust checks fail, the intended operator loop is simple:
 4. if it is not expected, stop and investigate instead of weakening the policy
 
 The secure path should be the shortest path, but it should never silently self-heal.
+
+## How It Compares
+
+| | `latchkeyd` | Broad env vars | Cloud broker only |
+| :--- | :---: | :---: | :---: |
+| **Secrets stay local** | Yes | Yes | No |
+| **Wrapper trust-pinning** | Yes | No | Varies |
+| **Binary trust-pinning** | Yes | No | Varies |
+| **Fail-closed on drift** | Yes | No | Policy-dependent |
+| **Works offline** | Yes | Yes | No |
+| **Local operator can inspect trust root** | Yes | Partial | No |
 
 ## Public Command Surface
 
