@@ -4,7 +4,7 @@ Local trust gate and secret broker for agent-driven developer workflows.
 
 `latchkeyd` helps local agents use real tools without turning your shell into a generic credential vending machine.
 
-![latchkeyd hero](docs/assets/hero.svg)
+![latchkeyd before and after](docs/assets/before-after.gif)
 
 ## Why this exists
 
