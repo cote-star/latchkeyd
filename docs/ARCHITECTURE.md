@@ -103,8 +103,11 @@ If any trust or policy check fails:
 ### Broker commands
 
 - `status`
-- `provider-exec`
-- `http-get`
+- `manifest init`
+- `manifest refresh`
+- `manifest verify`
+- `exec`
+- `validate`
 
 V1 should stay intentionally small.
 
@@ -124,6 +127,10 @@ That means the architecture should not assume language-package-registry publicat
 ```json
 {
   "version": 1,
+  "backend": {
+    "type": "file",
+    "filePath": "/abs/path/to/demo-secrets.json"
+  },
   "wrappers": {
     "example-wrapper": {
       "path": "/abs/path/to/example-wrapper",
@@ -133,7 +140,21 @@ That means the architecture should not assume language-package-registry publicat
   "binaries": {
     "example-cli": {
       "path": "/abs/path/to/example-cli",
-      "sha256": "..."
+      "sha256": "...",
+      "lookupName": "example-demo-cli"
+    }
+  },
+  "secrets": {
+    "example-token": {
+      "envVar": "LATCHKEYD_EXAMPLE_TOKEN",
+      "backendKey": "example-token"
+    }
+  },
+  "execPolicies": {
+    "example-demo": {
+      "wrapper": "example-wrapper",
+      "binary": "example-cli",
+      "secrets": ["example-token"]
     }
   }
 }
@@ -159,3 +180,9 @@ Cross-platform can come later with pluggable secret backends:
 - registry-publishing assumptions that do not match the broker language/runtime
 
 The project should expose primitives, reference wrappers, and policy examples, not ship someone else's workstation worldview.
+
+## Current Alpha Notes
+
+- caller trust in the alpha is based on trusted wrapper path and hash, not full same-user process attestation
+- PATH hijack protection is implemented by resolving an expected lookup name and comparing it to the trusted binary path
+- the file backend is a deliberate convenience backend for demos and CI, not the preferred long-term workstation posture

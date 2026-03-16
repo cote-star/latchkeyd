@@ -1,5 +1,13 @@
 {
   "version": 1,
+  "notes": [
+    "Starter shape for the public alpha example flow.",
+    "Use the file backend for demos and CI. Prefer keychain for real workstation use."
+  ],
+  "backend": {
+    "type": "file",
+    "filePath": "/absolute/path/to/examples/file-backend/demo-secrets.json"
+  },
   "wrappers": {
     "example-wrapper": {
       "path": "/absolute/path/to/example-wrapper",
@@ -9,7 +17,23 @@
   "binaries": {
     "example-cli": {
       "path": "/absolute/path/to/example-cli",
-      "sha256": "replace-me"
+      "sha256": "replace-me",
+      "lookupName": "example-demo-cli"
+    }
+  },
+  "secrets": {
+    "example-token": {
+      "envVar": "LATCHKEYD_EXAMPLE_TOKEN",
+      "backendKey": "example-token",
+      "description": "Harmless demo token for the example wrapper flow."
+    }
+  },
+  "execPolicies": {
+    "example-demo": {
+      "wrapper": "example-wrapper",
+      "binary": "example-cli",
+      "secrets": ["example-token"],
+      "description": "Reference policy for the public alpha example wrapper."
     }
   }
 }

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+token="${LATCHKEYD_EXAMPLE_TOKEN:-}"
+if [[ -z "${token}" ]]; then
+  echo '{"ok":false,"error":"missing_demo_secret"}' >&2
+  exit 10
+fi
+
+preview() {
+  local value="$1"
+  local prefix suffix
+  prefix="${value:0:2}"
+  suffix="${value: -2}"
+  printf '%s***%s' "${prefix}" "${suffix}"
+}
+
+printf '{"ok":true,"tool":"example-demo-cli","tokenPreview":"%s","tokenLength":%s,"args":[' "$(preview "${token}")" "${#token}"
+first=1
+for arg in "$@"; do
+  if [[ ${first} -eq 0 ]]; then
+    printf ','
+  fi
+  printf '"%s"' "${arg//\"/\\\"}"
+  first=0
+done
+printf ']}\n'

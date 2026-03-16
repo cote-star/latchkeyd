@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+VERSION="0.1.0-alpha.1"
+
+resolve_latchkeyd_bin() {
+  if [[ -n "${LATCHKEYD_BIN:-}" ]]; then
+    printf '%s\n' "${LATCHKEYD_BIN}"
+    return 0
+  fi
+  if command -v latchkeyd >/dev/null 2>&1; then
+    command -v latchkeyd
+    return 0
+  fi
+  if [[ -x "${REPO_ROOT}/.build/debug/latchkeyd" ]]; then
+    printf '%s\n' "${REPO_ROOT}/.build/debug/latchkeyd"
+    return 0
+  fi
+  echo "latchkeyd binary not found. Set LATCHKEYD_BIN or build the project first." >&2
+  exit 1
+}
+
+json() {
+  local payload="$1"
+  printf '%s\n' "${payload}"
+}
+
+usage() {
+  cat <<'USAGE' >&2
+Usage:
+  example-wrapper --health
+  example-wrapper --whoami
+  example-wrapper --version
+  example-wrapper --discover
+  example-wrapper demo [--manifest PATH] [-- ARG...]
+USAGE
+  exit 2
+}
+
+[[ $# -ge 1 ]] || usage
+action="$1"
+shift
+
+case "${action}" in
+  --health)
+    json '{"ok":true,"connector":"example-wrapper","operation":"health","message":"ready"}'
+    ;;
+  --whoami)
+    json "{\"ok\":true,\"connector\":\"example-wrapper\",\"operation\":\"whoami\",\"identity\":{\"wrapperPath\":\"${SCRIPT_DIR}/example-wrapper\"}}"
+    ;;
+  --version)
+    json "{\"ok\":true,\"connector\":\"example-wrapper\",\"operation\":\"version\",\"version\":\"${VERSION}\"}"
+    ;;
+  --discover)
+    json '{"ok":true,"connector":"example-wrapper","commands":[{"name":"demo","description":"Run the harmless broker-mediated example CLI."}],"contract":["--health","--whoami","--version","--discover"]}'
+    ;;
+  demo)
+    manifest_args=()
+    passthrough=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --manifest)
+          manifest_args+=("$1" "${2:-}")
+          shift 2
+          ;;
+        --)
+          shift
+          passthrough=("$@")
+          break
+          ;;
+        *)
+          passthrough+=("$1")
+          shift
+          ;;
+      esac
+    done
+
+    cmd=("$(resolve_latchkeyd_bin)" "exec")
+    if [[ ${#manifest_args[@]} -gt 0 ]]; then
+      cmd+=("${manifest_args[@]}")
+    fi
+    cmd+=("--policy" "example-demo" "--caller" "${SCRIPT_DIR}/example-wrapper" "--")
+    if [[ ${#passthrough[@]} -gt 0 ]]; then
+      cmd+=("${passthrough[@]}")
+    fi
+    PATH="${PATH}:${SCRIPT_DIR}" exec "${cmd[@]}"
+    ;;
+  *)
+    usage
+    ;;
+esac

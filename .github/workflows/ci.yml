@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Init manifest
+        run: .build/debug/latchkeyd manifest init --force
+
+      - name: Verify manifest
+        run: .build/debug/latchkeyd manifest verify
+
+      - name: Run example wrapper demo
+        env:
+          LATCHKEYD_BIN: ${{ github.workspace }}/.build/debug/latchkeyd
+        run: ./examples/bin/example-wrapper demo
+
+      - name: Validate setup
+        env:
+          LATCHKEYD_BIN: ${{ github.workspace }}/.build/debug/latchkeyd
+        run: .build/debug/latchkeyd validate

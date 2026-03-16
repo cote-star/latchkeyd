@@ -6,14 +6,23 @@ It lets agents use real tools without turning your shell into a generic credenti
 
 ## Current Status
 
-`latchkeyd` is pre-alpha.
+`latchkeyd` is a working public alpha for macOS-first local brokered workflows.
 
-This repository is intentionally being published design-first:
+Current alpha scope:
 
-- the concept and threat model are documented
-- the V1 architecture and scope are defined
-- the broker implementation is not shipped yet
-- the repo will evolve in public as the first working build lands
+- SwiftPM package with a real `latchkeyd` CLI
+- trust manifest init, refresh, verify, and validation commands
+- two secret backends: `file` and `keychain`
+- one end-to-end example wrapper and harmless demo CLI
+- JSONL event logging and GitHub Actions build/release workflows
+
+Still intentionally out of scope for this alpha:
+
+- long-running daemon mode
+- HTTP-specific broker commands
+- provider-specific integrations
+- cross-platform secret backends
+- code signing and notarization
 
 ## Why this exists
 
@@ -159,15 +168,72 @@ can a small local broker make agent workflows safer without becoming a giant pol
 
 That is the problem this project is trying to answer.
 
-## Near-Term Plan
+## CLI Surface
 
-The first implementation milestone is intentionally narrow:
+The current alpha ships these broker commands:
 
-1. ship a minimal Swift broker with a tiny command surface
-2. verify trusted callers and trusted downstream binaries
-3. demonstrate one approved exec flow end to end
-4. deny path hijacks, caller drift, and hash drift cleanly
-5. add validation and observability before feature breadth
+- `latchkeyd status`
+- `latchkeyd manifest init`
+- `latchkeyd manifest refresh`
+- `latchkeyd manifest verify`
+- `latchkeyd exec`
+- `latchkeyd validate`
+
+The default manifest path is:
+
+- `~/Library/Application Support/latchkeyd/manifest.json`
+
+The default event log path is:
+
+- `~/Library/Application Support/latchkeyd/events.jsonl`
+
+Use `--manifest PATH` to override the manifest location.
+
+## Build And Quickstart
+
+Build locally:
+
+```bash
+swift build
+```
+
+Initialize the example manifest:
+
+```bash
+./.build/debug/latchkeyd manifest init --force
+./.build/debug/latchkeyd manifest refresh
+```
+
+Run the example wrapper demo:
+
+```bash
+LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper demo
+```
+
+Run the compact validation pass:
+
+```bash
+LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./.build/debug/latchkeyd validate
+```
+
+What the example setup uses:
+
+- the `file` backend with [`examples/file-backend/demo-secrets.json`](examples/file-backend/demo-secrets.json)
+- the reference wrapper at [`examples/bin/example-wrapper`](examples/bin/example-wrapper)
+- the harmless demo CLI at [`examples/bin/example-demo-cli`](examples/bin/example-demo-cli)
+
+For real workstation use, the intended backend is `keychain`. The file backend exists to make demos, tests, CI, and first-run evaluation easy.
+
+## Denial Cases
+
+The alpha is meant to make trust failure obvious and reproducible.
+
+Examples you can trigger:
+
+- edit the example wrapper and run `latchkeyd manifest verify` before refresh to see hash drift denial
+- prepend a fake `example-demo-cli` earlier in `PATH` to trigger PATH hijack denial
+- call `latchkeyd exec` directly with an untrusted `--caller` path to trigger caller denial
+- point the file backend at a missing file to trigger backend configuration denial
 
 ## Proposed Repo Layout
 
@@ -203,7 +269,7 @@ A strong first public demo should show:
 4. A path-hijack or untrusted caller attempt fails closed.
 5. Validation proves the workstation is still in a good state.
 
-That demo would communicate both engineering quality and agent-systems judgment.
+That demo now exists in the repository example flow and is the baseline that future provider- or connector-style wrappers should build on.
 
 ## Contributing
 
