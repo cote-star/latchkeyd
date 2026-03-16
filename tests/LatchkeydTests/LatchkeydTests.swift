@@ -4,6 +4,18 @@ import Testing
 
 struct LatchkeydTests {
     @Test
+    func manifestLoadRejectsMalformedJSON() throws {
+        let temp = try temporaryDirectory()
+        let manifestURL = temp.appendingPathComponent("manifest.json")
+        try Data("{ not valid json".utf8).write(to: manifestURL)
+        let store = ManifestStore(manifestURL: manifestURL, currentDirectory: temp)
+
+        #expect(throws: LatchkeydError.self) {
+            _ = try store.load()
+        }
+    }
+
+    @Test
     func manifestInitCreatesExpectedEntries() throws {
         let temp = try temporaryDirectory()
         let repo = try makeFixtureRepo(at: temp)
@@ -16,6 +28,23 @@ struct LatchkeydTests {
         #expect(manifest.wrappers["example-wrapper"] != nil)
         #expect(manifest.binaries["example-cli"]?.lookupName == "example-demo-cli")
         #expect(FileManager.default.fileExists(atPath: manifestURL.path))
+    }
+
+    @Test
+    func manifestVerifyRejectsWrapperHashDrift() throws {
+        let temp = try temporaryDirectory()
+        let repo = try makeFixtureRepo(at: temp)
+        let manifestURL = temp.appendingPathComponent("manifest.json")
+        let store = ManifestStore(manifestURL: manifestURL, currentDirectory: repo)
+        _ = try store.initialize(force: true)
+
+        let wrapperPath = repo.appendingPathComponent("examples/bin/example-wrapper")
+        try Data("#!/usr/bin/env bash\necho drifted\n".utf8).write(to: wrapperPath)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: wrapperPath.path)
+
+        #expect(throws: LatchkeydError.self) {
+            _ = try store.verify()
+        }
     }
 
     @Test
@@ -72,6 +101,52 @@ struct LatchkeydTests {
     }
 
     @Test
+    func brokerSuccessLogsEventWithoutSecretLeakage() throws {
+        let temp = try temporaryDirectory()
+        let repo = try makeFixtureRepo(at: temp)
+        let wrapperPath = repo.appendingPathComponent("examples/bin/example-wrapper").path
+        let binaryPath = repo.appendingPathComponent("examples/bin/example-demo-cli").path
+        let secretsURL = repo.appendingPathComponent("examples/file-backend/demo-secrets.json").path
+        let secretValue = "fixture-token"
+        let eventsURL = temp.appendingPathComponent("events.jsonl")
+
+        let manifest = Manifest(
+            version: 1,
+            backend: SecretBackendConfig(type: .file, filePath: secretsURL),
+            wrappers: [
+                "example-wrapper": TrustedPath(path: wrapperPath, sha256: try sha256(forFileAtPath: wrapperPath))
+            ],
+            binaries: [
+                "example-cli": TrustedBinary(path: binaryPath, sha256: try sha256(forFileAtPath: binaryPath), lookupName: "example-demo-cli")
+            ],
+            secrets: [
+                "example-token": SecretSpec(envVar: "LATCHKEYD_EXAMPLE_TOKEN", backendKey: "example-token")
+            ],
+            execPolicies: [
+                "example-demo": ExecPolicy(wrapper: "example-wrapper", binary: "example-cli", secrets: ["example-token"])
+            ]
+        )
+
+        let backend = try SecretBackendFactory.makeBackend(config: manifest.backend)
+        let logger = EventLogger(eventsURL: eventsURL)
+        let service = BrokerService(
+            manifest: manifest,
+            backend: backend,
+            logger: logger,
+            environment: ["PATH": "\(repo.appendingPathComponent("examples/bin").path):\(ProcessInfo.processInfo.environment["PATH"] ?? "")"]
+        )
+
+        let status = try service.execute(
+            ExecRequest(policyName: "example-demo", callerPath: wrapperPath, arguments: [])
+        )
+
+        #expect(status == 0)
+        let contents = try String(contentsOf: eventsURL, encoding: .utf8)
+        #expect(contents.contains("\"result\":\"ok\""))
+        #expect(!contents.contains(secretValue))
+    }
+
+    @Test
     func trustedBinaryLookupDetectsHijackedPath() throws {
         let temp = try temporaryDirectory()
         let repo = try makeFixtureRepo(at: temp)
@@ -115,6 +190,57 @@ struct LatchkeydTests {
                 ExecRequest(policyName: "example-demo", callerPath: wrapperPath, arguments: [])
             )
         }
+
+        let contents = try String(contentsOf: temp.appendingPathComponent("events.jsonl"), encoding: .utf8)
+        #expect(contents.contains("\"result\":\"denied\""))
+        #expect(contents.contains("\"reason\":\"trust_denied\""))
+        #expect(!contents.contains("fixture-token"))
+    }
+
+    @Test
+    func brokerDeniesWhenFileBackendIsMisconfigured() throws {
+        let temp = try temporaryDirectory()
+        let repo = try makeFixtureRepo(at: temp)
+        let wrapperPath = repo.appendingPathComponent("examples/bin/example-wrapper").path
+        let binaryPath = repo.appendingPathComponent("examples/bin/example-demo-cli").path
+        let missingSecretsPath = repo.appendingPathComponent("examples/file-backend/missing.json").path
+        let eventsURL = temp.appendingPathComponent("events.jsonl")
+
+        let manifest = Manifest(
+            version: 1,
+            backend: SecretBackendConfig(type: .file, filePath: missingSecretsPath),
+            wrappers: [
+                "example-wrapper": TrustedPath(path: wrapperPath, sha256: try sha256(forFileAtPath: wrapperPath))
+            ],
+            binaries: [
+                "example-cli": TrustedBinary(path: binaryPath, sha256: try sha256(forFileAtPath: binaryPath), lookupName: "example-demo-cli")
+            ],
+            secrets: [
+                "example-token": SecretSpec(envVar: "LATCHKEYD_EXAMPLE_TOKEN", backendKey: "example-token")
+            ],
+            execPolicies: [
+                "example-demo": ExecPolicy(wrapper: "example-wrapper", binary: "example-cli", secrets: ["example-token"])
+            ]
+        )
+
+        let backend = try SecretBackendFactory.makeBackend(config: manifest.backend)
+        let logger = EventLogger(eventsURL: eventsURL)
+        let service = BrokerService(
+            manifest: manifest,
+            backend: backend,
+            logger: logger,
+            environment: ["PATH": "\(repo.appendingPathComponent("examples/bin").path):\(ProcessInfo.processInfo.environment["PATH"] ?? "")"]
+        )
+
+        #expect(throws: LatchkeydError.self) {
+            _ = try service.execute(
+                ExecRequest(policyName: "example-demo", callerPath: wrapperPath, arguments: [])
+            )
+        }
+
+        let contents = try String(contentsOf: eventsURL, encoding: .utf8)
+        #expect(contents.contains("\"result\":\"denied\""))
+        #expect(contents.contains("\"reason\":\"backend_error\""))
     }
 
     @Test
@@ -166,7 +292,7 @@ private func makeFixtureRepo(at root: URL) throws -> URL {
     let secrets = secretsDir.appendingPathComponent("demo-secrets.json")
 
     try Data("#!/usr/bin/env bash\nexit 0\n".utf8).write(to: wrapper)
-    try Data("#!/usr/bin/env bash\nexit 0\n".utf8).write(to: binary)
+    try Data("#!/usr/bin/env bash\nif [ -z \"${LATCHKEYD_EXAMPLE_TOKEN:-}\" ]; then\n  exit 9\nfi\nexit 0\n".utf8).write(to: binary)
     try Data(#"{"example-token":"fixture-token"}"#.utf8).write(to: secrets)
 
     try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: wrapper.path)

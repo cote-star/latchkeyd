@@ -13,8 +13,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Show toolchain
+        run: swift --version
+
       - name: Build release binary
         run: swift build -c release
+
+      - name: Test
+        run: swift test
+
+      - name: Init manifest
+        run: .build/release/latchkeyd manifest init --force
+
+      - name: Verify manifest
+        run: .build/release/latchkeyd manifest verify
+
+      - name: Validate setup
+        env:
+          LATCHKEYD_BIN: ${{ github.workspace }}/.build/release/latchkeyd
+        run: .build/release/latchkeyd validate
 
       - name: Package artifact
         run: |
