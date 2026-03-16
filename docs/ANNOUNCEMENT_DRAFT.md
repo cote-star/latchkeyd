@@ -1,29 +1,31 @@
 # Announcement Draft
 
-`latchkeyd` is now public.
+## Short Post
 
-It is a local trust gate and secret broker for agent-driven developer workflows.
+Open-sourced `latchkeyd`: a local trust gate for agent workflows.
 
-The project exists for a simple reason: local coding agents are useful, but most setups still force a bad choice between "too little access to help" and "too much access to trust."
+It keeps secrets local, verifies the wrapper and the tool, and fails closed on drift or hijack instead of turning your shell into a generic credential vending machine.
 
-`latchkeyd` takes a local-first approach:
+Repo:
+
+`https://github.com/cote-star/latchkeyd`
+
+## Medium Post
+
+Local coding agents are useful right up until they get broad access to real credentials.
+
+`latchkeyd` is a local trust gate and secret broker for that problem:
 
 - secrets stay local
 - wrappers and binaries are trust-pinned
 - secret release is explicit
-- drift and hijack cases fail closed
+- drift, hijack, and bypass fail closed
 
-What it is not:
+It is not a sandbox, not full endpoint security, and not "secure agents solved."
 
-- not a sandbox
-- not full endpoint security
-- not "secure agents solved"
+It is a narrower, more auditable way to let local agents use real tools with real credentials on a developer workstation.
 
-What it is:
-
-- a narrower, more auditable way to let local agents use real tools with real credentials
-
-Current alpha scope:
+Current alpha includes:
 
 - Swift CLI broker
 - manifest-driven trust model
@@ -32,10 +34,15 @@ Current alpha scope:
 - validation tooling
 - local JSONL event logs
 
-Suggested short post:
+## Launch Thread Skeleton
 
-> Open-sourced `latchkeyd`: a local trust gate for agent workflows. It keeps secrets local, pins trust to wrappers and binaries, and fails closed on drift or hijack instead of turning your shell into a credential vending machine.
-
-Suggested close:
-
-If you use local agents with real credentials and want a more explicit secret handoff model, this repo is for you.
+1. Problem:
+   local agents usually get either too little access to help or too much access to trust.
+2. Mechanism:
+   wrapper -> `latchkeyd` -> trusted tool, with explicit secret handoff.
+3. Proof:
+   before/after hero plus denial demos.
+4. Limits:
+   not a sandbox, not same-user compromise protection, not universal prompt-injection prevention.
+5. Close:
+   if you use local agents with real credentials and want a more explicit trust boundary, this repo is for you.
