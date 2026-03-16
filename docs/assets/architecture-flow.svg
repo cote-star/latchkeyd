@@ -1,43 +1,52 @@
 <svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1200" height="760" rx="28" fill="#F8F5EF"/>
-  <text x="72" y="80" fill="#132131" font-family="Inter, Arial, sans-serif" font-size="40" font-weight="700">latchkeyd architecture flow</text>
-  <text x="72" y="118" fill="#587086" font-family="Inter, Arial, sans-serif" font-size="22">Local-first trust mediation for one approved wrapper-to-binary secret handoff.</text>
-  <rect x="72" y="180" width="200" height="112" rx="20" fill="#E7EDF2"/>
-  <rect x="330" y="180" width="220" height="112" rx="20" fill="#E7EDF2"/>
-  <rect x="610" y="156" width="270" height="160" rx="24" fill="#23405B"/>
-  <rect x="940" y="180" width="188" height="112" rx="20" fill="#E7EDF2"/>
-  <rect x="72" y="424" width="248" height="150" rx="24" fill="#FFFFFF" stroke="#C9D4DD" stroke-width="3"/>
-  <rect x="360" y="424" width="248" height="150" rx="24" fill="#FFFFFF" stroke="#C9D4DD" stroke-width="3"/>
-  <rect x="648" y="424" width="248" height="150" rx="24" fill="#FFFFFF" stroke="#C9D4DD" stroke-width="3"/>
-  <rect x="936" y="424" width="192" height="150" rx="24" fill="#FFFFFF" stroke="#C9D4DD" stroke-width="3"/>
-  <path d="M272 236H330" stroke="#2E7A59" stroke-width="8" stroke-linecap="round"/>
-  <path d="M550 236H610" stroke="#2E7A59" stroke-width="8" stroke-linecap="round"/>
-  <path d="M880 236H940" stroke="#2E7A59" stroke-width="8" stroke-linecap="round"/>
-  <path d="M744 316V388" stroke="#2E7A59" stroke-width="8" stroke-linecap="round"/>
-  <path d="M484 424V354C484 332 502 314 524 314H610" stroke="#2E7A59" stroke-width="6" stroke-linecap="round"/>
-  <path d="M196 424V354C196 332 214 314 236 314H610" stroke="#2E7A59" stroke-width="6" stroke-linecap="round"/>
-  <path d="M772 424V354" stroke="#2E7A59" stroke-width="6" stroke-linecap="round"/>
-  <path d="M1032 424V354C1032 332 1014 314 992 314H880" stroke="#D07A7A" stroke-width="6" stroke-dasharray="12 12" stroke-linecap="round"/>
-  <text x="106" y="224" fill="#132131" font-family="Menlo, Monaco, monospace" font-size="28" font-weight="700">Agent</text>
-  <text x="360" y="224" fill="#132131" font-family="Menlo, Monaco, monospace" font-size="28" font-weight="700">Wrapper</text>
-  <text x="360" y="256" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="18">small action surface</text>
-  <text x="650" y="214" fill="#F8F5EF" font-family="Menlo, Monaco, monospace" font-size="30" font-weight="700">latchkeyd</text>
-  <text x="650" y="250" fill="#C8D5DF" font-family="Menlo, Monaco, monospace" font-size="18">verify wrapper</text>
-  <text x="650" y="278" fill="#C8D5DF" font-family="Menlo, Monaco, monospace" font-size="18">verify binary</text>
-  <text x="970" y="224" fill="#132131" font-family="Menlo, Monaco, monospace" font-size="28" font-weight="700">Binary</text>
-  <text x="970" y="256" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="18">scoped env only</text>
-  <text x="102" y="470" fill="#132131" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Trust Manifest</text>
-  <text x="102" y="504" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">wrappers</text>
-  <text x="102" y="528" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">binaries</text>
-  <text x="102" y="552" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">exec policies</text>
-  <text x="390" y="470" fill="#132131" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Secret Backend</text>
-  <text x="390" y="504" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">keychain</text>
-  <text x="390" y="528" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">file for demo / CI</text>
-  <text x="678" y="470" fill="#132131" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Validation</text>
-  <text x="678" y="504" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">verify trust state</text>
-  <text x="678" y="528" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">exercise denial path</text>
-  <text x="966" y="470" fill="#132131" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Denied Path</text>
-  <text x="966" y="504" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">drift</text>
-  <text x="966" y="528" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">hijack</text>
-  <text x="966" y="552" fill="#587086" font-family="Menlo, Monaco, monospace" font-size="17">bypass</text>
+  <rect width="1200" height="760" rx="28" fill="#F4F0E7"/>
+  <text x="72" y="86" fill="#132333" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">latchkeyd architecture flow</text>
+  <text x="72" y="126" fill="#5A7388" font-family="Inter, Arial, sans-serif" font-size="22">One approved wrapper-to-binary handoff, with local trust checks in the middle.</text>
+
+  <rect x="72" y="182" width="180" height="110" rx="22" fill="#E8EEF3"/>
+  <rect x="314" y="182" width="220" height="110" rx="22" fill="#E8EEF3"/>
+  <rect x="596" y="158" width="260" height="158" rx="24" fill="#2A4867"/>
+  <rect x="918" y="182" width="210" height="110" rx="22" fill="#E8EEF3"/>
+
+  <path d="M252 238H314" stroke="#2E7B59" stroke-width="8" stroke-linecap="round"/>
+  <path d="M534 238H596" stroke="#2E7B59" stroke-width="8" stroke-linecap="round"/>
+  <path d="M856 238H918" stroke="#2E7B59" stroke-width="8" stroke-linecap="round"/>
+
+  <text x="104" y="232" fill="#132333" font-family="Menlo, Monaco, monospace" font-size="26" font-weight="700">Agent</text>
+  <text x="346" y="232" fill="#132333" font-family="Menlo, Monaco, monospace" font-size="26" font-weight="700">Wrapper</text>
+  <text x="346" y="264" fill="#5A7388" font-family="Menlo, Monaco, monospace" font-size="16">small explicit surface</text>
+  <text x="628" y="218" fill="#F4F0E7" font-family="Menlo, Monaco, monospace" font-size="28" font-weight="700">latchkeyd</text>
+  <text x="628" y="252" fill="#D2DEE7" font-family="Menlo, Monaco, monospace" font-size="16">verify wrapper path + hash</text>
+  <text x="628" y="278" fill="#D2DEE7" font-family="Menlo, Monaco, monospace" font-size="16">verify binary path + hash</text>
+  <text x="628" y="304" fill="#D2DEE7" font-family="Menlo, Monaco, monospace" font-size="16">inject approved env vars</text>
+  <text x="950" y="232" fill="#132333" font-family="Menlo, Monaco, monospace" font-size="26" font-weight="700">Trusted tool</text>
+  <text x="950" y="264" fill="#5A7388" font-family="Menlo, Monaco, monospace" font-size="16">receives one handoff</text>
+
+  <rect x="72" y="420" width="236" height="138" rx="24" fill="#FFFFFF" stroke="#C6D2DC" stroke-width="3"/>
+  <rect x="350" y="420" width="236" height="138" rx="24" fill="#FFFFFF" stroke="#C6D2DC" stroke-width="3"/>
+  <rect x="628" y="420" width="236" height="138" rx="24" fill="#FFFFFF" stroke="#C6D2DC" stroke-width="3"/>
+  <rect x="906" y="420" width="222" height="138" rx="24" fill="#FFFFFF" stroke="#D9B2B2" stroke-width="3"/>
+
+  <path d="M714 316V388" stroke="#2E7B59" stroke-width="8" stroke-linecap="round"/>
+  <path d="M190 420V360C190 336 210 316 234 316H596" stroke="#2E7B59" stroke-width="6" stroke-linecap="round"/>
+  <path d="M468 420V360C468 336 488 316 512 316H596" stroke="#2E7B59" stroke-width="6" stroke-linecap="round"/>
+  <path d="M1018 420V360C1018 336 996 316 972 316H856" stroke="#D98484" stroke-width="6" stroke-dasharray="12 12" stroke-linecap="round"/>
+
+  <text x="102" y="468" fill="#132333" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Trust Manifest</text>
+  <text x="102" y="504" fill="#5A7388" font-family="Menlo, Monaco, monospace" font-size="17">wrappers</text>
+  <text x="102" y="530" fill="#5A7388" font-family="Menlo, Monaco, monospace" font-size="17">binaries</text>
+  <text x="102" y="556" fill="#5A7388" font-family="Menlo, Monaco, monospace" font-size="17">exec policies</text>
+
+  <text x="380" y="468" fill="#132333" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Secret Backend</text>
+  <text x="380" y="504" fill="#5A7388" font-family="Menlo, Monaco, monospace" font-size="17">keychain</text>
+  <text x="380" y="530" fill="#5A7388" font-family="Menlo, Monaco, monospace" font-size="17">file for demo / CI</text>
+
+  <text x="658" y="468" fill="#132333" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Validation</text>
+  <text x="658" y="504" fill="#5A7388" font-family="Menlo, Monaco, monospace" font-size="17">verify trust state</text>
+  <text x="658" y="530" fill="#5A7388" font-family="Menlo, Monaco, monospace" font-size="17">exercise denial path</text>
+
+  <text x="936" y="468" fill="#132333" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Denied path</text>
+  <text x="936" y="504" fill="#8C5E5E" font-family="Menlo, Monaco, monospace" font-size="17">drift</text>
+  <text x="936" y="530" fill="#8C5E5E" font-family="Menlo, Monaco, monospace" font-size="17">hijack</text>
+  <text x="936" y="556" fill="#8C5E5E" font-family="Menlo, Monaco, monospace" font-size="17">bypass</text>
 </svg>

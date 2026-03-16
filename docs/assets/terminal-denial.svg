@@ -1,18 +1,21 @@
 <svg width="1200" height="620" viewBox="0 0 1200 620" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="1200" height="620" rx="28" fill="#F4F0E7"/>
-  <rect x="52" y="44" width="1096" height="532" rx="24" fill="#112030"/>
+  <rect x="52" y="44" width="1096" height="532" rx="24" fill="#132333"/>
   <circle cx="94" cy="84" r="8" fill="#D77A7A"/>
   <circle cx="122" cy="84" r="8" fill="#D9B36F"/>
   <circle cx="150" cy="84" r="8" fill="#74B58B"/>
   <text x="188" y="91" fill="#A8BDCD" font-family="Menlo, Monaco, monospace" font-size="18">trust denial</text>
-  <text x="86" y="142" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="24">$ PATH="/tmp/hijack:$PATH" ./examples/bin/example-wrapper demo</text>
-  <text x="86" y="214" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="20">{</text>
-  <text x="114" y="246" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="20">"ok": false,</text>
-  <text x="114" y="278" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="20">"error": {</text>
-  <text x="142" y="310" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="20">"code": "TRUST_DENIED",</text>
-  <text x="142" y="342" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="20">"message": "PATH hijack detected for trusted binary"</text>
-  <text x="114" y="374" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="20">}</text>
-  <text x="86" y="406" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="20">}</text>
-  <text x="86" y="492" fill="#F4F0E7" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700">A binary name match is not trust.</text>
-  <text x="86" y="532" fill="#A8BDCD" font-family="Inter, Arial, sans-serif" font-size="24">Drift, hijack, and bypass should fail closed.</text>
+
+  <text x="84" y="140" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="20">$ PATH="/tmp/hijack:$PATH" example-wrapper demo</text>
+
+  <text x="84" y="208" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="18">{</text>
+  <text x="112" y="240" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="18">"ok": false,</text>
+  <text x="112" y="272" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="18">"error": {</text>
+  <text x="140" y="304" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="18">"code": "TRUST_DENIED",</text>
+  <text x="140" y="336" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="18">"message": "PATH hijack detected"</text>
+  <text x="112" y="368" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="18">}</text>
+  <text x="84" y="400" fill="#E39A9A" font-family="Menlo, Monaco, monospace" font-size="18">}</text>
+
+  <text x="84" y="500" fill="#F4F0E7" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">A binary name match is not trust.</text>
+  <text x="84" y="540" fill="#A8BDCD" font-family="Inter, Arial, sans-serif" font-size="24">Drift, hijack, and bypass should fail closed.</text>
 </svg>

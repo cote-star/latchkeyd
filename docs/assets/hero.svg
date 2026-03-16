@@ -1,34 +1,29 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1200" height="630" rx="32" fill="#F5F2EA"/>
-  <rect x="44" y="44" width="1112" height="542" rx="28" fill="#12202F"/>
-  <rect x="88" y="96" width="320" height="180" rx="24" fill="#EAF0F4"/>
-  <rect x="440" y="70" width="320" height="240" rx="28" fill="#24435F"/>
-  <rect x="792" y="96" width="320" height="180" rx="24" fill="#EAF0F4"/>
-  <rect x="850" y="360" width="210" height="126" rx="18" fill="#E7F2EC" stroke="#2F7A57" stroke-width="4"/>
-  <rect x="116" y="408" width="250" height="104" rx="20" fill="#3B2A2F" stroke="#CB6A6A" stroke-width="4"/>
-  <path d="M408 186H440" stroke="#7AC0A8" stroke-width="8" stroke-linecap="round"/>
-  <path d="M760 186H792" stroke="#7AC0A8" stroke-width="8" stroke-linecap="round"/>
-  <path d="M240 408C240 330 365 286 458 286" stroke="#D98989" stroke-width="6" stroke-dasharray="12 12" stroke-linecap="round"/>
-  <path d="M973 360V304" stroke="#7AC0A8" stroke-width="8" stroke-linecap="round"/>
-  <circle cx="424" cy="186" r="8" fill="#7AC0A8"/>
-  <circle cx="776" cy="186" r="8" fill="#7AC0A8"/>
-  <circle cx="973" cy="344" r="8" fill="#7AC0A8"/>
-  <text x="94" y="160" fill="#12202F" font-family="Menlo, Monaco, monospace" font-size="28" font-weight="700">Wrapper</text>
-  <text x="94" y="198" fill="#40627D" font-family="Menlo, Monaco, monospace" font-size="22">Small, explicit surface</text>
-  <text x="94" y="232" fill="#40627D" font-family="Menlo, Monaco, monospace" font-size="22">Calls latchkeyd exec</text>
-  <text x="470" y="142" fill="#F5F2EA" font-family="Menlo, Monaco, monospace" font-size="30" font-weight="700">latchkeyd</text>
-  <text x="470" y="188" fill="#C4D3DE" font-family="Menlo, Monaco, monospace" font-size="21">Verify wrapper path + hash</text>
-  <text x="470" y="220" fill="#C4D3DE" font-family="Menlo, Monaco, monospace" font-size="21">Verify binary path + hash</text>
-  <text x="470" y="252" fill="#C4D3DE" font-family="Menlo, Monaco, monospace" font-size="21">Inject only approved env vars</text>
-  <text x="470" y="284" fill="#C4D3DE" font-family="Menlo, Monaco, monospace" font-size="21">Fail closed on drift or hijack</text>
-  <text x="810" y="160" fill="#12202F" font-family="Menlo, Monaco, monospace" font-size="28" font-weight="700">Trusted Binary</text>
-  <text x="810" y="198" fill="#40627D" font-family="Menlo, Monaco, monospace" font-size="22">Receives one scoped handoff</text>
-  <text x="810" y="232" fill="#40627D" font-family="Menlo, Monaco, monospace" font-size="22">No generic secret vending</text>
-  <text x="875" y="410" fill="#224B38" font-family="Menlo, Monaco, monospace" font-size="24" font-weight="700">Local Secrets</text>
-  <text x="882" y="446" fill="#2F7A57" font-family="Menlo, Monaco, monospace" font-size="18">keychain / file</text>
-  <text x="138" y="446" fill="#F0D5D5" font-family="Menlo, Monaco, monospace" font-size="24" font-weight="700">Denied Path</text>
-  <text x="138" y="480" fill="#F0D5D5" font-family="Menlo, Monaco, monospace" font-size="18">drift, hijack, bypass</text>
-  <text x="90" y="64" fill="#B6C5D1" font-family="Inter, Arial, sans-serif" font-size="18" letter-spacing="1.8">LOCAL TRUST GATE FOR AGENT WORKFLOWS</text>
-  <text x="88" y="340" fill="#F5F2EA" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="700">Keep secrets local. Approve the handoff.</text>
-  <text x="88" y="388" fill="#B6C5D1" font-family="Inter, Arial, sans-serif" font-size="30">Your system, your rules, fail closed on drift.</text>
+  <rect width="1200" height="630" rx="32" fill="#F4F0E7"/>
+  <rect x="44" y="44" width="1112" height="542" rx="28" fill="#132333"/>
+  <text x="88" y="88" fill="#9BB0C2" font-family="Inter, Arial, sans-serif" font-size="18" letter-spacing="2">LOCAL TRUST GATE FOR AGENT WORKFLOWS</text>
+  <text x="88" y="192" fill="#F4F0E7" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="700">Keep secrets local.</text>
+  <text x="88" y="252" fill="#87A9C3" font-family="Inter, Arial, sans-serif" font-size="38">Approve the handoff. Fail closed on drift.</text>
+  <text x="88" y="326" fill="#C9D5DE" font-family="Inter, Arial, sans-serif" font-size="26">`latchkeyd` verifies the wrapper, verifies the tool,</text>
+  <text x="88" y="364" fill="#C9D5DE" font-family="Inter, Arial, sans-serif" font-size="26">and injects only the secret needed for that run.</text>
+
+  <rect x="88" y="430" width="220" height="96" rx="22" fill="#ECF1F5"/>
+  <rect x="364" y="430" width="220" height="96" rx="22" fill="#335171"/>
+  <rect x="640" y="430" width="220" height="96" rx="22" fill="#ECF1F5"/>
+  <rect x="916" y="430" width="170" height="96" rx="22" fill="#3C2B31" stroke="#D98484" stroke-width="4"/>
+  <path d="M308 478H364" stroke="#79C1A7" stroke-width="8" stroke-linecap="round"/>
+  <path d="M584 478H640" stroke="#79C1A7" stroke-width="8" stroke-linecap="round"/>
+  <path d="M860 478H916" stroke="#D98484" stroke-width="8" stroke-dasharray="12 12" stroke-linecap="round"/>
+
+  <text x="116" y="470" fill="#132333" font-family="Menlo, Monaco, monospace" font-size="22" font-weight="700">Wrapper</text>
+  <text x="116" y="500" fill="#557089" font-family="Menlo, Monaco, monospace" font-size="16">small action surface</text>
+
+  <text x="394" y="470" fill="#F4F0E7" font-family="Menlo, Monaco, monospace" font-size="22" font-weight="700">latchkeyd</text>
+  <text x="394" y="500" fill="#C8D6E1" font-family="Menlo, Monaco, monospace" font-size="16">verify + inject</text>
+
+  <text x="668" y="470" fill="#132333" font-family="Menlo, Monaco, monospace" font-size="22" font-weight="700">Trusted tool</text>
+  <text x="668" y="500" fill="#557089" font-family="Menlo, Monaco, monospace" font-size="16">scoped env only</text>
+
+  <text x="942" y="470" fill="#F2D7D7" font-family="Menlo, Monaco, monospace" font-size="22" font-weight="700">Denied</text>
+  <text x="942" y="500" fill="#F2D7D7" font-family="Menlo, Monaco, monospace" font-size="16">drift / hijack</text>
 </svg>

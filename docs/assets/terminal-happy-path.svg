@@ -1,17 +1,23 @@
 <svg width="1200" height="620" viewBox="0 0 1200 620" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="1200" height="620" rx="28" fill="#F4F0E7"/>
-  <rect x="52" y="44" width="1096" height="532" rx="24" fill="#112030"/>
+  <rect x="52" y="44" width="1096" height="532" rx="24" fill="#132333"/>
   <circle cx="94" cy="84" r="8" fill="#D77A7A"/>
   <circle cx="122" cy="84" r="8" fill="#D9B36F"/>
   <circle cx="150" cy="84" r="8" fill="#74B58B"/>
   <text x="188" y="91" fill="#A8BDCD" font-family="Menlo, Monaco, monospace" font-size="18">happy path</text>
-  <text x="86" y="142" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="24">$ swift build</text>
-  <text x="86" y="184" fill="#C7D4DE" font-family="Menlo, Monaco, monospace" font-size="22">Build complete!</text>
-  <text x="86" y="230" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="24">$ ./.build/debug/latchkeyd manifest init --force</text>
-  <text x="86" y="268" fill="#C7D4DE" font-family="Menlo, Monaco, monospace" font-size="20">{ "command": "manifest.init", "ok": true }</text>
-  <text x="86" y="314" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="24">$ LATCHKEYD_BIN=... ./examples/bin/example-wrapper demo</text>
-  <text x="86" y="352" fill="#C7D4DE" font-family="Menlo, Monaco, monospace" font-size="20">{ "ok": true, "tool": "example-demo-cli", "tokenPreview": "la***en" }</text>
-  <text x="86" y="398" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="24">$ ./.build/debug/latchkeyd validate</text>
-  <text x="86" y="436" fill="#C7D4DE" font-family="Menlo, Monaco, monospace" font-size="20">{ "command": "validate", "ok": true, "message": "Validation succeeded." }</text>
-  <text x="86" y="516" fill="#F4F0E7" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700">Trusted wrapper. Trusted binary. Scoped handoff.</text>
+
+  <text x="84" y="140" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="21">$ swift build</text>
+  <text x="84" y="176" fill="#D4DEE6" font-family="Menlo, Monaco, monospace" font-size="18">Build complete!</text>
+
+  <text x="84" y="224" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="21">$ latchkeyd manifest init --force</text>
+  <text x="84" y="258" fill="#D4DEE6" font-family="Menlo, Monaco, monospace" font-size="18">{ "command": "manifest.init", "ok": true }</text>
+
+  <text x="84" y="306" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="21">$ example-wrapper demo</text>
+  <text x="84" y="340" fill="#D4DEE6" font-family="Menlo, Monaco, monospace" font-size="18">{ "ok": true, "tool": "example-demo-cli" }</text>
+  <text x="84" y="370" fill="#D4DEE6" font-family="Menlo, Monaco, monospace" font-size="18">{ "tokenPreview": "la***en", "tokenLength": 19 }</text>
+
+  <text x="84" y="420" fill="#7EC3A9" font-family="Menlo, Monaco, monospace" font-size="21">$ latchkeyd validate</text>
+  <text x="84" y="454" fill="#D4DEE6" font-family="Menlo, Monaco, monospace" font-size="18">{ "command": "validate", "ok": true }</text>
+
+  <text x="84" y="520" fill="#F4F0E7" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">Trusted wrapper. Trusted binary. Scoped handoff.</text>
 </svg>
