@@ -7,6 +7,13 @@ Current generated assets:
 - `terminal-happy-path.webp`
 - `terminal-denial.webp`
 
+Current supporting assets:
+
+- `before-after-anim.webp`
+- `attack-surface-anim.webp`
+- `architecture-flow.png`
+- `share-card.svg`
+
 ## Regenerate
 
 Install the renderer dependency once:
@@ -41,3 +48,16 @@ When the repo adds QR-based branding later:
 - do not place QR branding on every asset
 
 This promotion layer should stay secondary to product proof.
+
+## Alt Text Guidance
+
+Use descriptive alt text for promoted assets.
+
+Recommended starting points:
+
+- `before-after-anim.webp`: `Animated before-and-after showing broad local credential exposure replaced by explicit trust-mode selection and trust-mediated execution.`
+- `attack-surface-anim.webp`: `Animation showing how a local trust broker narrows prompt-injection fallout by verifying wrapper and binary before credential-backed access.`
+- `architecture-flow.png`: `Architecture diagram showing wrapper, local trust broker, trusted binary, and local secret backend flow.`
+- `terminal-happy-path.webp`: `Terminal still showing a successful trusted handoff through latchkeyd.`
+- `terminal-denial.webp`: `Terminal still showing a trust denial before the secret is released.`
+- `share-card.svg`: `Share card for latchkeyd, a macOS local trust broker with explicit trust modes.`

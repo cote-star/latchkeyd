@@ -364,6 +364,7 @@ This project should be understood as local defense in depth for approved workflo
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- [`docs/REPO_METADATA.md`](docs/REPO_METADATA.md)
 - [`docs/TRUST_MODES_SPEC.md`](docs/TRUST_MODES_SPEC.md)
 - [`docs/MANIFEST_EVOLUTION_SPEC.md`](docs/MANIFEST_EVOLUTION_SPEC.md)
 - [`docs/CLI_MODE_UX_SPEC.md`](docs/CLI_MODE_UX_SPEC.md)

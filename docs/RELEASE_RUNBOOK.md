@@ -15,6 +15,7 @@ This is the operator checklist for cutting a public `latchkeyd` macOS alpha.
 ## Preconditions
 
 - `README.md`, `CHANGELOG.md`, and demo docs match the current shipped behavior
+- GitHub About metadata matches [`docs/REPO_METADATA.md`](docs/REPO_METADATA.md)
 - `wip/feature_test_report`, `wip/claims_test_report`, and `wip/release_readiness_report` have been regenerated for the candidate commit
 - local uncommitted review notes are not the only source of release truth
 - the release candidate commit is on the branch you intend to push
@@ -89,6 +90,7 @@ The hosted workflows should cover:
 - binary downloads correctly
 - checksum matches the published artifact
 - README images and demo links render on GitHub
+- GitHub repo description, homepage, and topics still match [`docs/REPO_METADATA.md`](docs/REPO_METADATA.md)
 - release notes and changelog match the shipped behavior
 
 ## If A Gate Fails
