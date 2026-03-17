@@ -7,6 +7,7 @@ public enum LatchkeydError: Error {
     case manifest(String)
     case trust(String, [String: JSONValue]?)
     case backend(String)
+    case logging(String, [String: JSONValue]?)
     case execution(String, Int32?)
 
     public var exitCode: Int32 {
@@ -21,6 +22,8 @@ public enum LatchkeydError: Error {
             return 5
         case .backend:
             return 6
+        case .logging:
+            return 8
         case .execution(_, let status):
             return status ?? 7
         }
@@ -38,12 +41,35 @@ public enum LatchkeydError: Error {
             return ErrorOutput(code: "TRUST_DENIED", message: message, details: details)
         case .backend(let message):
             return ErrorOutput(code: "BACKEND_ERROR", message: message)
+        case .logging(let message, let details):
+            return ErrorOutput(code: "LOGGING_ERROR", message: message, details: details)
         case .execution(let message, let status):
             var details: [String: JSONValue] = [:]
             if let status {
                 details["exitStatus"] = .int(Int(status))
             }
             return ErrorOutput(code: "EXEC_FAILED", message: message, details: details.isEmpty ? nil : details)
+        }
+    }
+}
+
+extension LatchkeydError {
+    var logShape: (result: String, reason: String) {
+        switch self {
+        case .usage:
+            return ("denied", "usage_error")
+        case .io:
+            return ("failed", "io_error")
+        case .manifest:
+            return ("denied", "manifest_invalid")
+        case .trust:
+            return ("denied", "trust_denied")
+        case .backend:
+            return ("denied", "backend_error")
+        case .logging:
+            return ("failed", "logging_error")
+        case .execution:
+            return ("failed", "exec_failed")
         }
     }
 }

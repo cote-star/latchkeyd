@@ -24,6 +24,9 @@ jobs:
       - name: Init manifest
         run: .build/debug/latchkeyd manifest init --force
 
+      - name: Refresh manifest
+        run: .build/debug/latchkeyd manifest refresh
+
       - name: Verify manifest
         run: .build/debug/latchkeyd manifest verify
 
@@ -36,3 +39,6 @@ jobs:
         env:
           LATCHKEYD_BIN: ${{ github.workspace }}/.build/debug/latchkeyd
         run: .build/debug/latchkeyd validate
+
+      - name: Offline smoke proof
+        run: scripts/offline_smoke.sh

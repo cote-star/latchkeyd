@@ -30,6 +30,7 @@ public struct BrokerService {
         var wrapperPath: String?
         var binaryName: String?
         var binaryPath: String?
+        try logger.prepare()
 
         do {
             guard let policy = manifest.execPolicies[request.policyName] else {
@@ -106,7 +107,7 @@ public struct BrokerService {
             try process.run()
             process.waitUntilExit()
             if process.terminationStatus == 0 {
-                logger.log(
+                try logger.log(
                     command: "exec",
                     result: "ok",
                     backendType: backend.type,
@@ -116,7 +117,7 @@ public struct BrokerService {
                     binaryPath: trustedBinaryPath
                 )
             } else {
-                logger.log(
+                try logger.log(
                     command: "exec",
                     result: "failed",
                     reason: "child_exit_\(process.terminationStatus)",
@@ -130,32 +131,41 @@ public struct BrokerService {
             return process.terminationStatus
         } catch let error as LatchkeydError {
             let logShape = error.logShape
-            logger.log(
-                command: "exec",
-                result: logShape.result,
-                reason: logShape.reason,
-                backendType: backend.type,
-                wrapperName: wrapperName,
-                wrapperPath: wrapperPath,
-                binaryName: binaryName,
-                binaryPath: binaryPath
-            )
+            do {
+                try logger.log(
+                    command: "exec",
+                    result: logShape.result,
+                    reason: logShape.reason,
+                    backendType: backend.type,
+                    wrapperName: wrapperName,
+                    wrapperPath: wrapperPath,
+                    binaryName: binaryName,
+                    binaryPath: binaryPath
+                )
+            } catch let loggingError as LatchkeydError {
+                throw enrichLoggingError(loggingError, command: "exec", originalError: error)
+            }
             throw error
         } catch {
-            logger.log(
-                command: "exec",
-                result: "failed",
-                reason: "unexpected_error",
-                backendType: backend.type,
-                wrapperName: wrapperName,
-                wrapperPath: wrapperPath,
-                binaryName: binaryName,
-                binaryPath: binaryPath
-            )
-            throw LatchkeydError.execution(
+            let executionError = LatchkeydError.execution(
                 "Failed to launch trusted binary `\(binaryPath ?? "<unknown>")`: \(error.localizedDescription)",
                 nil
             )
+            do {
+                try logger.log(
+                    command: "exec",
+                    result: "failed",
+                    reason: "unexpected_error",
+                    backendType: backend.type,
+                    wrapperName: wrapperName,
+                    wrapperPath: wrapperPath,
+                    binaryName: binaryName,
+                    binaryPath: binaryPath
+                )
+            } catch let loggingError as LatchkeydError {
+                throw enrichLoggingError(loggingError, command: "exec", originalError: executionError)
+            }
+            throw executionError
         }
     }
 
@@ -192,23 +202,19 @@ public struct BrokerService {
             )
         }
     }
-}
 
-private extension LatchkeydError {
-    var logShape: (result: String, reason: String) {
-        switch self {
-        case .usage:
-            return ("denied", "usage_error")
-        case .io:
-            return ("failed", "io_error")
-        case .manifest:
-            return ("denied", "manifest_invalid")
-        case .trust:
-            return ("denied", "trust_denied")
-        case .backend:
-            return ("denied", "backend_error")
-        case .execution:
-            return ("failed", "exec_failed")
+    private func enrichLoggingError(
+        _ loggingError: LatchkeydError,
+        command: String,
+        originalError: LatchkeydError
+    ) -> LatchkeydError {
+        guard case .logging(let message, let details) = loggingError else {
+            return loggingError
         }
+
+        var mergedDetails = details ?? [:]
+        mergedDetails["command"] = .string(command)
+        mergedDetails["originalErrorCode"] = .string(originalError.errorOutput.error.code)
+        return .logging(message, mergedDetails)
     }
 }

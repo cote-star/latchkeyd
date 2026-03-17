@@ -1,6 +1,6 @@
 import Foundation
 
-public let latchkeydVersion = "0.1.0-alpha.1"
+public let latchkeydVersion = "0.1.0-alpha.2"
 
 public struct CommandOutput: Codable {
     public let ok: Bool

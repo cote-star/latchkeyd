@@ -1,75 +1,101 @@
 # Release Runbook
 
-This document is the operator checklist for cutting a public `latchkeyd` release.
+This is the operator checklist for cutting a public `latchkeyd` macOS alpha.
+
+## Release Target
+
+- current target: `v0.1.0-alpha.2`
+- positioning: macOS-only public alpha
+- accepted alpha limitations:
+  - no daemon mode
+  - no cross-platform backend story
+  - no same-user compromise claim
+  - no signing or notarization yet
 
 ## Preconditions
 
-- `main` is green in GitHub Actions
-- the README and docs match the current shipped behavior
-- demo assets are present and reviewable
-- the release notes and changelog are current
+- `README.md`, `CHANGELOG.md`, and demo docs match the current shipped behavior
+- `wip/feature_test_report`, `wip/claims_test_report`, and `wip/release_readiness_report` have been regenerated for the candidate commit
+- local uncommitted review notes are not the only source of release truth
+- the release candidate commit is on the branch you intend to push
 
-## Versioning
+## Local Gates Before Any Tag
 
-Suggested alpha tag shape:
-
-- `v0.1.0-alpha.1`
-- `v0.1.0-alpha.2`
-
-## Local verification before tag
+Run these from the repo root:
 
 ```bash
 swift build
 swift test
-./.build/debug/latchkeyd manifest init --force
-./.build/debug/latchkeyd manifest verify
-LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper demo
-LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./.build/debug/latchkeyd validate
+scripts/offline_smoke.sh
+scripts/local_workflow_parity.sh
 ```
 
-## Tagging
+Expected outcome:
+
+- build and tests pass
+- offline smoke succeeds with invalid proxy endpoints
+- local parity succeeds for debug and release flows, including packaging and checksum generation
+
+## Audit Contract Check
+
+Before tagging, confirm the release candidate still matches the enforced audit contract:
+
+- `exec` and `validate` preflight the event log path
+- manifest lifecycle commands return `LOGGING_ERROR` if the audit log cannot be created or appended
+- append failures after child execution surface as `LOGGING_ERROR` with incomplete audit details
+
+Do not announce or tag a build that can silently skip audit logging.
+
+## Hosted Gates Required Before Public Release
+
+Local parity is necessary but not sufficient. A release is not public-ready until hosted runs are green.
+
+1. Push the release candidate branch/commit.
+2. Confirm the `ci` workflow passes on GitHub Actions.
+3. Create the release tag:
 
 ```bash
 git checkout main
 git pull --ff-only
-git tag v0.1.0-alpha.1
-git push origin v0.1.0-alpha.1
+git tag v0.1.0-alpha.2
+git push origin main
+git push origin v0.1.0-alpha.2
 ```
 
-## Expected GitHub release flow
+4. Confirm the hosted `release` workflow passes for the tag.
+5. Confirm the workflow publishes:
+   - `dist/latchkeyd`
+   - `dist/latchkeyd.sha256`
 
-The tag should trigger the `release` workflow, which:
+If either hosted workflow is red, the candidate is not release-ready.
 
-1. builds the release binary
-2. runs tests
-3. runs manifest init and verify
-4. runs `validate`
-5. packages `dist/latchkeyd`
-6. publishes `dist/latchkeyd.sha256`
+## Expected Hosted Workflow Coverage
 
-## Post-release checks
+The hosted workflows should cover:
 
-- confirm the GitHub Release exists
-- confirm the binary downloads correctly
-- verify the published checksum
-- verify the README renders images and demo links correctly on GitHub
-- confirm the changelog entry and release notes match
+- `swift build`
+- `swift test`
+- manifest `init`
+- manifest `refresh`
+- manifest `verify`
+- wrapper demo or validation path
+- `validate`
+- offline smoke proof in CI
+- release packaging and checksum creation on tagged builds
 
-## If the release workflow fails
+## Post-Release Checks
+
+- GitHub Release exists for the tag
+- binary downloads correctly
+- checksum matches the published artifact
+- README images and demo links render on GitHub
+- release notes and changelog match the shipped behavior
+
+## If A Gate Fails
 
 Do not move the tag forward silently.
 
-Instead:
-
-1. inspect the failed run
-2. fix the workflow or the code
-3. cut a new tag for the corrected release
-
-## Announcement gating
-
-Before public announcement, confirm:
-
-- release artifact exists
-- checksum exists
-- docs and visuals render correctly
-- the demo package reflects the current build
+1. inspect the failing local or hosted gate
+2. fix the code, workflow, or docs
+3. regenerate the `wip/` reports
+4. cut a new candidate instead of force-moving the existing tag

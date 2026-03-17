@@ -15,12 +15,13 @@ public struct Validator {
 
     public func run(selfExecutablePath: String) throws -> [ValidationItem] {
         var results: [ValidationItem] = []
+        try logger.prepare()
         let manifest = try manifestStore.load()
+        let backend = try SecretBackendFactory.makeBackend(config: manifest.backend)
 
         results.append(ValidationItem(name: "manifest:load", ok: true, message: "loaded"))
         results.append(contentsOf: try manifestStore.verify())
 
-        let backend = try SecretBackendFactory.makeBackend(config: manifest.backend)
         try backend.availabilityCheck()
         results.append(ValidationItem(name: "backend:\(backend.type.rawValue)", ok: true, message: "available"))
 
@@ -33,7 +34,7 @@ public struct Validator {
         try runDeniedScenario(selfExecutablePath: selfExecutablePath)
         results.append(ValidationItem(name: "denial:untrusted-caller", ok: true, message: "denial confirmed"))
 
-        logger.log(command: "validate", result: "ok", backendType: backend.type)
+        try logger.log(command: "validate", result: "ok", backendType: backend.type)
         return results
     }
 
