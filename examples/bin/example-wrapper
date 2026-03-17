@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-VERSION="0.1.0-alpha.1"
+VERSION="0.1.0-alpha.3"
 
 resolve_latchkeyd_bin() {
   if [[ -n "${LATCHKEYD_BIN:-}" ]]; then
@@ -35,6 +35,7 @@ Usage:
   example-wrapper --version
   example-wrapper --discover
   example-wrapper demo [--manifest PATH] [-- ARG...]
+  example-wrapper brokered-demo [--manifest PATH] [-- ARG...]
 USAGE
   exit 2
 }
@@ -54,9 +55,9 @@ case "${action}" in
     json "{\"ok\":true,\"connector\":\"example-wrapper\",\"operation\":\"version\",\"version\":\"${VERSION}\"}"
     ;;
   --discover)
-    json '{"ok":true,"connector":"example-wrapper","commands":[{"name":"demo","description":"Run the harmless broker-mediated example CLI."}],"contract":["--health","--whoami","--version","--discover"]}'
+    json '{"ok":true,"connector":"example-wrapper","commands":[{"name":"demo","description":"Run the harmless handoff-mode example CLI."},{"name":"brokered-demo","description":"Run the brokered-mode example CLI over a local broker session."}],"contract":["--health","--whoami","--version","--discover"]}'
     ;;
-  demo)
+  demo|brokered-demo)
     manifest_args=()
     passthrough=()
     while [[ $# -gt 0 ]]; do
@@ -81,7 +82,11 @@ case "${action}" in
     if [[ ${#manifest_args[@]} -gt 0 ]]; then
       cmd+=("${manifest_args[@]}")
     fi
-    cmd+=("--policy" "example-demo" "--caller" "${SCRIPT_DIR}/example-wrapper" "--")
+    policy_name="example-demo"
+    if [[ "${action}" == "brokered-demo" ]]; then
+      policy_name="example-brokered"
+    fi
+    cmd+=("--policy" "${policy_name}" "--caller" "${SCRIPT_DIR}/example-wrapper" "--")
     if [[ ${#passthrough[@]} -gt 0 ]]; then
       cmd+=("${passthrough[@]}")
     fi

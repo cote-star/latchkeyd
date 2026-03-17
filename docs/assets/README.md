@@ -28,3 +28,16 @@ The renderer prefers a locally installed Google Chrome browser through Puppeteer
 - keeps the demos visually consistent
 - makes CLI stills easier to refresh when output changes
 - matches the repo's warm-paper visual system without hand-editing SVG text
+
+## QR Branding Rule
+
+When the repo adds QR-based branding later:
+
+- QR marks only go on animations or images
+- place them in the bottom-right corner
+- do not let the QR overlap the primary visual content
+- keep the QR small
+- keep the maintainer name visually more prominent than the QR itself
+- do not place QR branding on every asset
+
+This promotion layer should stay secondary to product proof.

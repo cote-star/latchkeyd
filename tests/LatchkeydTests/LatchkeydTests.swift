@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Testing
 @testable import LatchkeydCore
 
@@ -16,6 +17,100 @@ struct LatchkeydTests {
     }
 
     @Test
+    func legacyManifestPolicyDefaultsToHandoffMode() throws {
+        let temp = try temporaryDirectory()
+        let manifestURL = temp.appendingPathComponent("manifest.json")
+        let manifestJSON = """
+        {
+          "version": 1,
+          "backend": {
+            "type": "file",
+            "filePath": "/tmp/demo-secrets.json"
+          },
+          "wrappers": {
+            "example-wrapper": {
+              "path": "/tmp/example-wrapper",
+              "sha256": "abc"
+            }
+          },
+          "binaries": {
+            "example-cli": {
+              "path": "/tmp/example-cli",
+              "sha256": "def"
+            }
+          },
+          "secrets": {
+            "example-token": {
+              "envVar": "LATCHKEYD_EXAMPLE_TOKEN",
+              "backendKey": "example-token"
+            }
+          },
+          "execPolicies": {
+            "example-demo": {
+              "wrapper": "example-wrapper",
+              "binary": "example-cli",
+              "secrets": ["example-token"]
+            }
+          }
+        }
+        """
+        try Data(manifestJSON.utf8).write(to: manifestURL)
+
+        let store = ManifestStore(manifestURL: manifestURL, currentDirectory: temp)
+        let manifest = try store.load()
+
+        #expect(manifest.execPolicies["example-demo"]?.mode == .handoff)
+    }
+
+    @Test
+    func manifestLoadRejectsUnknownPolicyMode() throws {
+        let temp = try temporaryDirectory()
+        let manifestURL = temp.appendingPathComponent("manifest.json")
+        let manifestJSON = """
+        {
+          "version": 1,
+          "backend": {
+            "type": "file",
+            "filePath": "/tmp/demo-secrets.json"
+          },
+          "wrappers": {
+            "example-wrapper": {
+              "path": "/tmp/example-wrapper",
+              "sha256": "abc"
+            }
+          },
+          "binaries": {
+            "example-cli": {
+              "path": "/tmp/example-cli",
+              "sha256": "def"
+            }
+          },
+          "secrets": {
+            "example-token": {
+              "envVar": "LATCHKEYD_EXAMPLE_TOKEN",
+              "backendKey": "example-token"
+            }
+          },
+          "execPolicies": {
+            "example-demo": {
+              "mode": "banana",
+              "wrapper": "example-wrapper",
+              "binary": "example-cli",
+              "secrets": ["example-token"]
+            }
+          }
+        }
+        """
+        try Data(manifestJSON.utf8).write(to: manifestURL)
+
+        let store = ManifestStore(manifestURL: manifestURL, currentDirectory: temp)
+
+        #expect(throws: LatchkeydError.self) {
+            _ = try store.load()
+        }
+    }
+
+    @Test
     func manifestInitCreatesExpectedEntries() throws {
         let temp = try temporaryDirectory()
         let repo = try makeFixtureRepo(at: temp)
@@ -24,9 +119,12 @@ struct LatchkeydTests {
 
         let manifest = try store.initialize(force: true)
 
+        #expect(manifest.version == 2)
         #expect(manifest.backend.type == .file)
         #expect(manifest.wrappers["example-wrapper"] != nil)
         #expect(manifest.binaries["example-cli"]?.lookupName == "example-demo-cli")
+        #expect(manifest.operationSets?["example-brokered-ops"] != nil)
+        #expect(manifest.execPolicies["example-brokered"]?.mode == .brokered)
         #expect(FileManager.default.fileExists(atPath: manifestURL.path))
     }
 
@@ -44,6 +142,39 @@ struct LatchkeydTests {
 
         #expect(throws: LatchkeydError.self) {
             _ = try store.verify()
+        }
+    }
+
+    @Test
+    func manifestPoliciesDefaultToHandoffMode() throws {
+        let temp = try temporaryDirectory()
+        let repo = try makeFixtureRepo(at: temp)
+        let manifestURL = temp.appendingPathComponent("manifest.json")
+        let store = ManifestStore(manifestURL: manifestURL, currentDirectory: repo)
+
+        _ = try store.initialize(force: true)
+        try updateManifestPolicy(at: manifestURL) { policy in
+            policy.removeValue(forKey: "mode")
+        }
+
+        let manifest = try store.load()
+        #expect(manifest.execPolicies["example-demo"]?.mode == .handoff)
+    }
+
+    @Test
+    func manifestLoadRejectsUnknownMode() throws {
+        let temp = try temporaryDirectory()
+        let repo = try makeFixtureRepo(at: temp)
+        let manifestURL = temp.appendingPathComponent("manifest.json")
+        let store = ManifestStore(manifestURL: manifestURL, currentDirectory: repo)
+
+        _ = try store.initialize(force: true)
+        try updateManifestPolicy(at: manifestURL) { policy in
+            policy["mode"] = "invalid-mode"
+        }
+
+        #expect(throws: LatchkeydError.self) {
+            _ = try store.load()
         }
     }
 
@@ -148,8 +279,107 @@ struct LatchkeydTests {
         #expect(events.first?.reason == nil)
         #expect(events.first?.wrapperName == "example-wrapper")
         #expect(events.first?.binaryName == "example-cli")
+        #expect(events.first?.policyMode == "handoff")
         let contents = try String(contentsOf: eventsURL, encoding: .utf8)
         #expect(!contents.contains(secretValue))
+    }
+
+    @Test
+    func oneshotPolicyAllowsBoundedExecArguments() throws {
+        let temp = try temporaryDirectory()
+        let repo = try makeFixtureRepo(at: temp)
+        let wrapperPath = repo.appendingPathComponent("examples/bin/example-wrapper").path
+        let binaryPath = repo.appendingPathComponent("examples/bin/example-demo-cli").path
+        let secretsURL = repo.appendingPathComponent("examples/file-backend/demo-secrets.json").path
+        let eventsURL = temp.appendingPathComponent("events.jsonl")
+
+        let manifest = Manifest(
+            version: 1,
+            backend: SecretBackendConfig(type: .file, filePath: secretsURL),
+            wrappers: [
+                "example-wrapper": TrustedPath(path: wrapperPath, sha256: try sha256(forFileAtPath: wrapperPath))
+            ],
+            binaries: [
+                "example-cli": TrustedBinary(path: binaryPath, sha256: try sha256(forFileAtPath: binaryPath), lookupName: "example-demo-cli")
+            ],
+            secrets: [
+                "example-token": SecretSpec(envVar: "LATCHKEYD_EXAMPLE_TOKEN", backendKey: "example-token")
+            ],
+            execPolicies: [
+                "example-demo": ExecPolicy(mode: .oneshot, wrapper: "example-wrapper", binary: "example-cli", secrets: ["example-token"])
+            ]
+        )
+
+        let backend = try SecretBackendFactory.makeBackend(config: manifest.backend)
+        let logger = EventLogger(eventsURL: eventsURL)
+        let service = BrokerService(
+            manifest: manifest,
+            backend: backend,
+            logger: logger,
+            environment: ["PATH": "\(repo.appendingPathComponent("examples/bin").path):\(ProcessInfo.processInfo.environment["PATH"] ?? "")"]
+        )
+
+        let status = try service.execute(
+            ExecRequest(policyName: "example-demo", callerPath: wrapperPath, arguments: ["publish"])
+        )
+
+        #expect(status == 0)
+        let events = try decodeEventRecords(at: eventsURL)
+        #expect(events.count == 1)
+        #expect(events.first?.result == "ok")
+        #expect(events.first?.policyMode == "oneshot")
+    }
+
+    @Test
+    func oneshotPolicyRejectsObviousLongLivedArguments() throws {
+        let temp = try temporaryDirectory()
+        let repo = try makeFixtureRepo(at: temp)
+        let wrapperPath = repo.appendingPathComponent("examples/bin/example-wrapper").path
+        let binaryPath = repo.appendingPathComponent("examples/bin/example-demo-cli").path
+        let secretsURL = repo.appendingPathComponent("examples/file-backend/demo-secrets.json").path
+        let eventsURL = temp.appendingPathComponent("events.jsonl")
+
+        let manifest = Manifest(
+            version: 1,
+            backend: SecretBackendConfig(type: .file, filePath: secretsURL),
+            wrappers: [
+                "example-wrapper": TrustedPath(path: wrapperPath, sha256: try sha256(forFileAtPath: wrapperPath))
+            ],
+            binaries: [
+                "example-cli": TrustedBinary(path: binaryPath, sha256: try sha256(forFileAtPath: binaryPath), lookupName: "example-demo-cli")
+            ],
+            secrets: [
+                "example-token": SecretSpec(envVar: "LATCHKEYD_EXAMPLE_TOKEN", backendKey: "example-token")
+            ],
+            execPolicies: [
+                "example-demo": ExecPolicy(mode: .oneshot, wrapper: "example-wrapper", binary: "example-cli", secrets: ["example-token"])
+            ]
+        )
+
+        let backend = try SecretBackendFactory.makeBackend(config: manifest.backend)
+        let logger = EventLogger(eventsURL: eventsURL)
+        let service = BrokerService(
+            manifest: manifest,
+            backend: backend,
+            logger: logger,
+            environment: ["PATH": "\(repo.appendingPathComponent("examples/bin").path):\(ProcessInfo.processInfo.environment["PATH"] ?? "")"]
+        )
+
+        do {
+            _ = try service.execute(
+                ExecRequest(policyName: "example-demo", callerPath: wrapperPath, arguments: ["--watch"])
+            )
+            Issue.record("Expected oneshot mode to reject obvious long-lived arguments.")
+        } catch let error as LatchkeydError {
+            #expect(error.errorOutput.error.code == "USAGE_ERROR")
+            #expect(error.errorOutput.error.message.contains("oneshot mode"))
+        }
+
+        let events = try decodeEventRecords(at: eventsURL)
+        #expect(events.count == 1)
+        #expect(events.first?.result == "denied")
+        #expect(events.first?.reason == "usage_error")
+        #expect(events.first?.policyMode == "oneshot")
     }
 
     @Test
@@ -301,6 +531,97 @@ struct LatchkeydTests {
             #expect(error.errorOutput.error.code == "LOGGING_ERROR")
             #expect(error.errorOutput.error.details?["auditStatus"] == .string("unavailable"))
         }
+    }
+
+    @Test
+    func oneshotPolicyRejectsLongRunningArguments() throws {
+        let temp = try temporaryDirectory()
+        let repo = try makeFixtureRepo(at: temp)
+        let wrapperPath = repo.appendingPathComponent("examples/bin/example-wrapper").path
+        let binaryPath = repo.appendingPathComponent("examples/bin/example-demo-cli").path
+        let secretsURL = repo.appendingPathComponent("examples/file-backend/demo-secrets.json").path
+        let eventsURL = temp.appendingPathComponent("events.jsonl")
+
+        let manifest = Manifest(
+            version: 1,
+            notes: ["policy:example-demo:mode=oneshot"],
+            backend: SecretBackendConfig(type: .file, filePath: secretsURL),
+            wrappers: [
+                "example-wrapper": TrustedPath(path: wrapperPath, sha256: try sha256(forFileAtPath: wrapperPath))
+            ],
+            binaries: [
+                "example-cli": TrustedBinary(path: binaryPath, sha256: try sha256(forFileAtPath: binaryPath), lookupName: "example-demo-cli")
+            ],
+            secrets: [
+                "example-token": SecretSpec(envVar: "LATCHKEYD_EXAMPLE_TOKEN", backendKey: "example-token")
+            ],
+            execPolicies: [
+                "example-demo": ExecPolicy(wrapper: "example-wrapper", binary: "example-cli", secrets: ["example-token"])
+            ]
+        )
+
+        let backend = try SecretBackendFactory.makeBackend(config: manifest.backend)
+        let logger = EventLogger(eventsURL: eventsURL)
+        let service = BrokerService(
+            manifest: manifest,
+            backend: backend,
+            logger: logger,
+            environment: ["PATH": "\(repo.appendingPathComponent("examples/bin").path):\(ProcessInfo.processInfo.environment["PATH"] ?? "")"]
+        )
+
+        do {
+            _ = try service.execute(
+                ExecRequest(policyName: "example-demo", callerPath: wrapperPath, arguments: ["--watch"])
+            )
+            Issue.record("Expected oneshot policy to reject watch flag.")
+        } catch let error as LatchkeydError {
+            #expect(error.errorOutput.error.code == "USAGE_ERROR")
+        }
+    }
+
+    @Test
+    func oneshotPolicyExecutesBoundedCommand() throws {
+        let temp = try temporaryDirectory()
+        let repo = try makeFixtureRepo(at: temp)
+        let wrapperPath = repo.appendingPathComponent("examples/bin/example-wrapper").path
+        let binaryPath = repo.appendingPathComponent("examples/bin/example-demo-cli").path
+        let secretsURL = repo.appendingPathComponent("examples/file-backend/demo-secrets.json").path
+        let eventsURL = temp.appendingPathComponent("events.jsonl")
+
+        let manifest = Manifest(
+            version: 1,
+            notes: ["policy:example-demo:mode=oneshot"],
+            backend: SecretBackendConfig(type: .file, filePath: secretsURL),
+            wrappers: [
+                "example-wrapper": TrustedPath(path: wrapperPath, sha256: try sha256(forFileAtPath: wrapperPath))
+            ],
+            binaries: [
+                "example-cli": TrustedBinary(path: binaryPath, sha256: try sha256(forFileAtPath: binaryPath), lookupName: "example-demo-cli")
+            ],
+            secrets: [
+                "example-token": SecretSpec(envVar: "LATCHKEYD_EXAMPLE_TOKEN", backendKey: "example-token")
+            ],
+            execPolicies: [
+                "example-demo": ExecPolicy(wrapper: "example-wrapper", binary: "example-cli", secrets: ["example-token"])
+            ]
+        )
+
+        let backend = try SecretBackendFactory.makeBackend(config: manifest.backend)
+        let logger = EventLogger(eventsURL: eventsURL)
+        let service = BrokerService(
+            manifest: manifest,
+            backend: backend,
+            logger: logger,
+            environment: ["PATH": "\(repo.appendingPathComponent("examples/bin").path):\(ProcessInfo.processInfo.environment["PATH"] ?? "")"]
+        )
+
+        let status = try service.execute(
+            ExecRequest(policyName: "example-demo", callerPath: wrapperPath, arguments: [])
+        )
+
+        #expect(status == 0)
+        let events = try decodeEventRecords(at: eventsURL)
+        #expect(events.first?.result == "ok")
     }
 
     @Test
@@ -574,6 +895,8 @@ struct LatchkeydTests {
         #expect(statusOutput.ok)
         #expect(statusOutput.command == "status")
         #expect(statusOutput.data?["manifestPath"] == .string(manifestURL.path))
+        #expect(statusOutput.data?["supportedModes"] == .array(ExecMode.allCases.map { .string($0.rawValue) }))
+        #expect(statusOutput.data?["brokeredProtocolVersion"] == .int(1))
 
         let refreshResult = try runProcess(
             executable: latchkeydBin.path,
@@ -594,7 +917,7 @@ struct LatchkeydTests {
         #expect(verifyOutput.ok)
         #expect(verifyOutput.command == "manifest.verify")
         if case .array(let items)? = verifyOutput.data?["items"] {
-            #expect(items.count == 2)
+            #expect(items.count == 5)
             for item in items {
                 if case .object(let itemObject) = item {
                     #expect(itemObject["ok"] == .bool(true))
@@ -631,6 +954,86 @@ struct LatchkeydTests {
     }
 
     @Test
+    func demoCLIBrokeredSessionExercisesSecretResolve() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let demoCLI = repoRoot.appendingPathComponent("examples/bin/example-demo-cli")
+        let socketDir = try temporaryDirectory()
+        let socketPath = socketDir.appendingPathComponent("brokered.sock").path
+        let listener = try UnixDomainSocketListener(path: socketPath)
+
+        let serverReady = DispatchSemaphore(value: 0)
+        let requestHandled = DispatchSemaphore(value: 0)
+        var serverError: Error?
+
+        DispatchQueue.global().async {
+            serverReady.signal()
+            do {
+                let client = try listener.acceptConnection()
+                defer { Darwin.close(client) }
+                let requestLine = try listener.readLine(from: client)
+                if let requestData = requestLine.data(using: .utf8),
+                   let request = try JSONSerialization.jsonObject(with: requestData, options: []) as? [String: Any] {
+                    #expect(request["operation"] as? String == "secret.resolve")
+                    #expect(request["sessionId"] as? String == "session-123")
+                    if let arguments = request["arguments"] as? [String: Any] {
+                        #expect(arguments["secretName"] as? String == "example-token")
+                    } else {
+                        Issue.record("Expected broker request arguments to be present.")
+                    }
+                } else {
+                    Issue.record("Expected broker request to be JSON.")
+                }
+                let response: [String: Any] = [
+                    "ok": true,
+                    "operation": "secret.resolve",
+                    "data": [
+                        "secretName": "example-token",
+                        "value": "brokered-secret"
+                    ]
+                ]
+                try listener.sendResponse(for: client, json: response)
+            } catch {
+                serverError = error
+            }
+            requestHandled.signal()
+        }
+
+        serverReady.wait()
+        let brokeredArgs = ["smoke"]
+        let result = try runProcess(
+            executable: "/bin/bash",
+            arguments: [demoCLI.path] + brokeredArgs,
+            environment: [
+                "LATCHKEYD_SESSION_SOCKET": socketPath,
+                "LATCHKEYD_SESSION_ID": "session-123",
+                "LATCHKEYD_SESSION_TOKEN": "session-token",
+                "LATCHKEYD_POLICY_NAME": "example-demo",
+                "LATCHKEYD_POLICY_MODE": "brokered",
+            ]
+        )
+
+        requestHandled.wait()
+        if result.status != 0 {
+            Issue.record("demo CLI exit \(result.status). stdout: \(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)) stderr: \(result.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
+        }
+        #expect(result.status == 0)
+        #expect(serverError == nil)
+        let output = try decodeDemoCLIOutput(result.stdout)
+        #expect(output.ok)
+        if let brokered = output.brokeredOperation {
+            #expect(brokered.operation == "secret.resolve")
+            #expect(brokered.secretName == "example-token")
+            #expect(brokered.valueLength == 15)
+        } else {
+            Issue.record("Expected brokeredOperation block in demo CLI output.")
+        }
+        #expect(output.args == brokeredArgs)
+    }
+
+    @Test
     func wrapperHealthAndDiscoverAreCallable() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -658,7 +1061,117 @@ struct LatchkeydTests {
         let discoverOutput = try decodeWrapperDiscoverOutput(discover.stdout)
         #expect(discoverOutput.ok)
         #expect(discoverOutput.connector == "example-wrapper")
-        #expect(discoverOutput.commands.map(\.name) == ["demo"])
+        #expect(discoverOutput.commands.map(\.name) == ["demo", "brokered-demo"])
+    }
+
+    @Test
+    func brokeredRawExecAndWrapperDemoResolveSecretThroughSession() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let latchkeydBin = repoRoot.appendingPathComponent(".build/debug/latchkeyd")
+        let wrapper = repoRoot.appendingPathComponent("examples/bin/example-wrapper")
+        let manifestURL = try temporaryDirectory().appendingPathComponent("manifest.json")
+
+        let baseEnvironment = [
+            "LATCHKEYD_BIN": latchkeydBin.path,
+            "PATH": "\(repoRoot.appendingPathComponent("examples/bin").path):\(ProcessInfo.processInfo.environment["PATH"] ?? "")"
+        ]
+
+        let initResult = try runProcess(
+            executable: latchkeydBin.path,
+            arguments: ["manifest", "init", "--manifest", manifestURL.path, "--force"],
+            environment: baseEnvironment,
+            currentDirectory: repoRoot
+        )
+        #expect(initResult.status == 0)
+
+        let refreshResult = try runProcess(
+            executable: latchkeydBin.path,
+            arguments: ["manifest", "refresh", "--manifest", manifestURL.path],
+            environment: baseEnvironment,
+            currentDirectory: repoRoot
+        )
+        #expect(refreshResult.status == 0)
+
+        let rawExec = try runProcess(
+            executable: latchkeydBin.path,
+            arguments: [
+                "exec",
+                "--manifest", manifestURL.path,
+                "--policy", "example-brokered",
+                "--caller", wrapper.path,
+                "--", "smoke"
+            ],
+            environment: baseEnvironment,
+            currentDirectory: repoRoot
+        )
+        #expect(rawExec.status == 0)
+        let rawOutput = try decodeDemoCLIOutput(rawExec.stdout)
+        #expect(rawOutput.ok)
+        #expect(rawOutput.transport == "brokered")
+        #expect(rawOutput.brokeredOperation?.operation == "secret.resolve")
+        #expect(rawOutput.brokeredOperation?.policyMode == "brokered")
+        #expect(rawOutput.args == ["smoke"])
+
+        let wrapperExec = try runProcess(
+            executable: "/bin/bash",
+            arguments: [wrapper.path, "brokered-demo", "--manifest", manifestURL.path, "alpha"],
+            environment: ["LATCHKEYD_BIN": latchkeydBin.path],
+            currentDirectory: repoRoot
+        )
+        #expect(wrapperExec.status == 0)
+        let wrapperOutput = try decodeDemoCLIOutput(wrapperExec.stdout)
+        #expect(wrapperOutput.ok)
+        #expect(wrapperOutput.transport == "brokered")
+        #expect(wrapperOutput.brokeredOperation?.operation == "secret.resolve")
+        #expect(wrapperOutput.args == ["alpha"])
+    }
+
+    @Test
+    func brokeredExecRejectsUnsupportedOperation() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let latchkeydBin = repoRoot.appendingPathComponent(".build/debug/latchkeyd")
+        let wrapper = repoRoot.appendingPathComponent("examples/bin/example-wrapper")
+        let manifestURL = try temporaryDirectory().appendingPathComponent("manifest.json")
+
+        let baseEnvironment = [
+            "LATCHKEYD_BIN": latchkeydBin.path,
+            "PATH": "\(repoRoot.appendingPathComponent("examples/bin").path):\(ProcessInfo.processInfo.environment["PATH"] ?? "")"
+        ]
+
+        _ = try runProcess(
+            executable: latchkeydBin.path,
+            arguments: ["manifest", "init", "--manifest", manifestURL.path, "--force"],
+            environment: baseEnvironment,
+            currentDirectory: repoRoot
+        )
+        _ = try runProcess(
+            executable: latchkeydBin.path,
+            arguments: ["manifest", "refresh", "--manifest", manifestURL.path],
+            environment: baseEnvironment,
+            currentDirectory: repoRoot
+        )
+
+        let result = try runProcess(
+            executable: latchkeydBin.path,
+            arguments: [
+                "exec",
+                "--manifest", manifestURL.path,
+                "--policy", "example-brokered",
+                "--caller", wrapper.path,
+                "--", "--brokered-operation", "secret.invalid"
+            ],
+            environment: baseEnvironment,
+            currentDirectory: repoRoot
+        )
+
+        #expect(result.status != 0)
+        #expect(result.stdout.contains("OPERATION_NOT_ALLOWED"))
     }
 }
 
@@ -711,12 +1224,130 @@ private func runProcess(
     )
 }
 
+private func updateManifestPolicy(at manifestURL: URL, transform: (inout [String: Any]) -> Void) throws {
+    let data = try Data(contentsOf: manifestURL)
+    var json = try JSONSerialization.jsonObject(with: data, options: []) as! [String: Any]
+    guard var execPolicies = json["execPolicies"] as? [String: Any],
+          var policy = execPolicies["example-demo"] as? [String: Any] else {
+        fatalError("Expected manifest execPolicies entry for example-demo")
+    }
+    transform(&policy)
+    execPolicies["example-demo"] = policy
+    json["execPolicies"] = execPolicies
+    let updated = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+    try updated.write(to: manifestURL)
+}
+
+private final class UnixDomainSocketListener {
+    let path: String
+    private let listeningFD: Int32
+
+    init(path: String) throws {
+        self.path = path
+        listeningFD = Darwin.socket(AF_UNIX, Int32(SOCK_STREAM), 0)
+        guard listeningFD >= 0 else {
+            throw posixError(errno)
+        }
+        _ = Darwin.unlink(path)
+
+        var addr = sockaddr_un()
+        addr.sun_len = UInt8(MemoryLayout<sockaddr_un>.size)
+        addr.sun_family = sa_family_t(AF_UNIX)
+        path.withCString { cstr in
+            let maxBytes = MemoryLayout.size(ofValue: addr.sun_path) - 1
+            strncpy(&addr.sun_path.0, cstr, maxBytes)
+        }
+
+        var addrCopy = addr
+        let addressLength = socklen_t(addrCopy.sun_len)
+        let bindResult = withUnsafePointer(to: &addrCopy) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
+                bind(listeningFD, sockPtr, addressLength)
+            }
+        }
+        guard bindResult >= 0 else {
+            Darwin.close(listeningFD)
+            throw posixError(errno)
+        }
+
+        guard listen(listeningFD, 1) >= 0 else {
+            Darwin.close(listeningFD)
+            throw posixError(errno)
+        }
+    }
+
+    func acceptConnection() throws -> Int32 {
+        let client = Darwin.accept(listeningFD, nil, nil)
+        guard client >= 0 else {
+            throw posixError(errno)
+        }
+        return client
+    }
+
+    func readLine(from fd: Int32) throws -> String {
+        var buffer = Data()
+        var byte: UInt8 = 0
+        while true {
+            let bytesRead = Darwin.read(fd, &byte, 1)
+            if bytesRead <= 0 {
+                break
+            }
+            if byte == 0x0a {
+                break
+            }
+            buffer.append(byte)
+        }
+        guard let line = String(data: buffer, encoding: .utf8) else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(EILSEQ), userInfo: nil)
+        }
+        return line
+    }
+
+    func sendResponse(for fd: Int32, json: [String: Any]) throws {
+        var data = try JSONSerialization.data(withJSONObject: json, options: [])
+        data.append(0x0a)
+        try data.withUnsafeBytes { ptr in
+            var written = 0
+            while written < ptr.count {
+                let chunk = Darwin.write(fd, ptr.baseAddress!.advanced(by: written), ptr.count - written)
+                if chunk <= 0 {
+                    throw posixError(errno)
+                }
+                written += chunk
+            }
+        }
+    }
+
+    deinit {
+        Darwin.close(listeningFD)
+        _ = Darwin.unlink(path)
+    }
+}
+
+extension UnixDomainSocketListener: @unchecked Sendable {}
+
+private func posixError(_ code: Int32) -> Error {
+    NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: nil)
+}
+
 private struct DemoCLIOutput: Decodable {
     let ok: Bool
     let tool: String
-    let tokenPreview: String
-    let tokenLength: Int
+    let transport: String?
+    let tokenPreview: String?
+    let tokenLength: Int?
     let args: [String]
+    let brokeredOperation: BrokeredOperation?
+}
+
+private struct BrokeredOperation: Decodable {
+    let operation: String
+    let secretName: String
+    let valuePreview: String
+    let valueLength: Int
+    let policyName: String
+    let policyMode: String
+    let sessionId: String?
 }
 
 private struct WrapperOperationOutput: Decodable {

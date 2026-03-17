@@ -2,7 +2,7 @@
 
 These demos show the intended failure posture of `latchkeyd`.
 
-The point is not just that the happy path works. The point is that unexpected drift and unsafe execution paths fail closed.
+They are trust failures before handoff or during an approved brokered session. They are not claims about post-handoff confinement after a trusted child already has access.
 
 ## 1. Wrapper drift
 
@@ -62,12 +62,14 @@ Expected result:
 
 ## 4. Backend misconfiguration
 
-Point the file backend at a missing file:
+Use a temporary manifest and point the file backend at a missing file:
 
 ```bash
-perl -0pi -e 's#"filePath" : "([^"]+)"#"filePath" : "/tmp/does-not-exist.json"#' \
-  ~/Library/Application\ Support/latchkeyd/manifest.json
-./.build/debug/latchkeyd validate
+tmpdir="$(mktemp -d)"
+./.build/debug/latchkeyd manifest init --manifest "$tmpdir/manifest.json" --force
+./.build/debug/latchkeyd manifest refresh --manifest "$tmpdir/manifest.json"
+perl -0pi -e 's#"filePath" : "([^"]+)"#"filePath" : "/tmp/does-not-exist.json"#' "$tmpdir/manifest.json"
+./.build/debug/latchkeyd validate --manifest "$tmpdir/manifest.json"
 ```
 
 Expected result:
@@ -76,6 +78,45 @@ Expected result:
 - validation failure
 - no secret material released
 
-## Demo narrative
+## 5. Audit log unavailable
 
-"A name match is not trust. A drifted file is not trust. A direct caller path is not trust. `latchkeyd` makes those failures obvious instead of silently falling back."
+Make the event-log path unusable before a brokered run:
+
+```bash
+mkdir -p /tmp/latchkeyd-events-blocked
+./.build/debug/latchkeyd exec \
+  --manifest ~/Library/Application\ Support/latchkeyd/manifest.json \
+  --policy example-demo \
+  --caller "$PWD/examples/bin/example-wrapper"
+```
+
+Expected result:
+
+- `LOGGING_ERROR`
+- the run does not proceed as an unaudited success
+
+## 6. Unsupported brokered operation
+
+Ask the brokered example CLI for an operation that is not allowed:
+
+```bash
+LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" \
+./examples/bin/example-wrapper brokered-demo -- --brokered-operation secret.invalid
+```
+
+Expected result:
+
+- `OPERATION_NOT_ALLOWED`
+- the request is denied inside the brokered session
+- no secret value is returned
+
+## What The Operator Does Next
+
+1. inspect the failing wrapper, binary, backend path, or brokered operation
+2. decide whether the change is expected
+3. if it is expected, re-pin with `manifest refresh`
+4. if it is not expected, stop and investigate instead of weakening the policy
+
+## Demo Narrative
+
+“A name match is not trust. A drifted file is not trust. A direct caller path is not trust. An unsupported brokered request is not trust. `latchkeyd` makes those failures explicit instead of silently falling back.”

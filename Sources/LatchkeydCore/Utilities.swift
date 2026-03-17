@@ -8,6 +8,7 @@ public enum LatchkeydError: Error {
     case trust(String, [String: JSONValue]?)
     case backend(String)
     case logging(String, [String: JSONValue]?)
+    case brokered(String, String, [String: JSONValue]?)
     case execution(String, Int32?)
 
     public var exitCode: Int32 {
@@ -24,6 +25,8 @@ public enum LatchkeydError: Error {
             return 6
         case .logging:
             return 8
+        case .brokered:
+            return 7
         case .execution(_, let status):
             return status ?? 7
         }
@@ -43,6 +46,8 @@ public enum LatchkeydError: Error {
             return ErrorOutput(code: "BACKEND_ERROR", message: message)
         case .logging(let message, let details):
             return ErrorOutput(code: "LOGGING_ERROR", message: message, details: details)
+        case .brokered(let code, let message, let details):
+            return ErrorOutput(code: code, message: message, details: details)
         case .execution(let message, let status):
             var details: [String: JSONValue] = [:]
             if let status {
@@ -68,6 +73,9 @@ extension LatchkeydError {
             return ("denied", "backend_error")
         case .logging:
             return ("failed", "logging_error")
+        case .brokered(let code, _, _):
+            let deniedCodes: Set<String> = ["OPERATION_NOT_ALLOWED", "SESSION_AUTH_ERROR"]
+            return (deniedCodes.contains(code) ? "denied" : "failed", code.lowercased())
         case .execution:
             return ("failed", "exec_failed")
         }
@@ -197,5 +205,67 @@ public func currentProcessCommandLine(parentPID: Int32? = nil) -> String {
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     } catch {
         return ""
+    }
+}
+
+public func rejectedOneshotArgument(in arguments: [String]) -> String? {
+    let disallowedArguments: Set<String> = [
+        "--daemon",
+        "daemon",
+        "--serve",
+        "serve",
+        "--watch",
+        "watch"
+    ]
+
+    return arguments.first { disallowedArguments.contains($0.lowercased()) }
+}
+
+public enum ExecutionMode: String {
+    case handoff
+    case oneshot
+}
+
+extension Manifest {
+    public func executionMode(forPolicy policyName: String) -> ExecutionMode {
+        let directives = modeDirectives()
+        if let policySpecific = directives["policy:\(policyName)"] {
+            return policySpecific
+        }
+        if let globalMode = directives["global"] {
+            return globalMode
+        }
+        return .handoff
+    }
+
+    private func modeDirectives() -> [String: ExecutionMode] {
+        guard let notes = notes else { return [:] }
+        var result: [String: ExecutionMode] = [:]
+        for note in notes {
+            if let (key, mode) = parseModeDirective(note) {
+                result[key] = mode
+            }
+        }
+        return result
+    }
+
+    private func parseModeDirective(_ note: String) -> (String, ExecutionMode)? {
+        let normalized = note.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.hasPrefix("mode=") {
+            let value = String(normalized.dropFirst("mode=".count))
+            if let mode = ExecutionMode(rawValue: value) {
+                return ("global", mode)
+            }
+            return nil
+        }
+        let components = normalized.split(separator: ":").map(String.init)
+        if components.count >= 3, components[0] == "policy", components[2].hasPrefix("mode=") {
+            let policyName = components[1]
+            let value = String(components[2].dropFirst("mode=".count))
+            if let mode = ExecutionMode(rawValue: value) {
+                return ("policy:\(policyName)", mode)
+            }
+        }
+        return nil
     }
 }

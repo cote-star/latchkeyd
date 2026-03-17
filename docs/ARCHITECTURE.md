@@ -2,24 +2,28 @@
 
 ## Objective
 
-Provide a reusable local secret broker for agent-mediated tool execution on a single-user machine.
+Provide a reusable local trust broker for agent-mediated tool execution on a single-user machine.
 
-The system should stay small enough to audit, narrow enough to trust, and practical enough to use in real local workflows.
+The system should stay:
 
-## Implemented alpha shape
+- small enough to audit
+- narrow enough to trust
+- practical enough to use in real local workflows
 
-The current public alpha ships as a single-shot Swift CLI, not a long-running daemon.
+## Implemented Shape
 
-That is an intentional product boundary for now:
+The current repo ships as a single-shot Swift CLI, not a long-running daemon.
+
+That boundary is still intentional:
 
 - one executable
-- one manifest-driven trust model
-- one brokered exec path
+- one manifest-driven trust root
 - one validation path
+- multiple policy modes
 
 The internal shape is still broker-oriented so later daemonization does not require changing the trust model.
 
-## High-level components
+## High-Level Components
 
 ### 1. Broker core
 
@@ -30,10 +34,10 @@ Responsibilities:
 - resolve the selected secret backend
 - verify trusted wrapper identity
 - verify trusted downstream executable identity
-- inject only approved secret env vars
-- launch the approved command
+- enforce the selected execution mode
+- emit structured errors and audit events
 
-Current alpha command surface:
+Current command surface:
 
 - `status`
 - `manifest init`
@@ -41,12 +45,6 @@ Current alpha command surface:
 - `manifest verify`
 - `exec`
 - `validate`
-
-Important limits:
-
-- no generic secret fetch command
-- no provider-specific logic in core
-- no browser/session automation logic
 
 ### 2. Trust manifest
 
@@ -56,7 +54,8 @@ Responsibilities:
 - record trusted binary paths and hashes
 - define the selected secret backend
 - define named secret entries
-- define exec policies mapping wrapper -> binary -> secrets
+- define reusable brokered operation sets
+- define exec policies with explicit mode
 
 Requirements:
 
@@ -65,11 +64,11 @@ Requirements:
 - fail-closed verification
 - human-editable format
 
-Current alpha manifest fields:
+Current repo shape:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "backend": {
     "type": "file",
     "filePath": "/abs/path/to/demo-secrets.json"
@@ -93,11 +92,30 @@ Current alpha manifest fields:
       "backendKey": "example-token"
     }
   },
+  "operationSets": {
+    "example-brokered-ops": {
+      "operations": [
+        {
+          "name": "secret.resolve",
+          "allowedSecrets": ["example-token"],
+          "allowedResponseFields": ["secretName", "value", "lifetimeSeconds"]
+        }
+      ]
+    }
+  },
   "execPolicies": {
     "example-demo": {
+      "mode": "handoff",
       "wrapper": "example-wrapper",
       "binary": "example-cli",
       "secrets": ["example-token"]
+    },
+    "example-brokered": {
+      "mode": "brokered",
+      "wrapper": "example-wrapper",
+      "binary": "example-cli",
+      "secrets": ["example-token"],
+      "operationSet": "example-brokered-ops"
     }
   }
 }
@@ -105,17 +123,15 @@ Current alpha manifest fields:
 
 ### 3. Secret backends
 
-The backend interface is intentionally small:
+The backend interface stays intentionally small:
 
 - availability check
 - resolve named secret
 
-Current alpha backends:
+Current backends:
 
 - `file` for demos, tests, CI, and first-run evaluation
 - `keychain` for real macOS local use
-
-The `file` backend is convenience infrastructure, not the preferred long-term workstation posture.
 
 ### 4. Wrappers
 
@@ -132,7 +148,7 @@ Reference wrapper contract:
 - `--whoami`
 - `--version`
 - `--discover`
-- one explicit safe action surface
+- explicit safe action surfaces such as `demo` and `brokered-demo`
 
 See [`../examples/wrapper-contract.md`](../examples/wrapper-contract.md).
 
@@ -140,81 +156,164 @@ See [`../examples/wrapper-contract.md`](../examples/wrapper-contract.md).
 
 The validation layer exists to prove the expected trust boundary still works.
 
-Current alpha validation checks:
+Current validation checks:
 
 - manifest readability
 - trust entry verification
+- mode-aware manifest validation
 - backend availability
 - example wrapper health
-- example wrapper demo success
+- example wrapper handoff demo success
+- example wrapper brokered demo success
 - at least one denied-path scenario
 
-Observability in the alpha is local JSONL event logging with no secret values.
+Observability is local JSONL event logging with no secret values.
 
-## Control flow
+## Execution Modes
 
-### Trusted exec path
+The repo now treats execution mode as a first-class architectural boundary.
 
-1. An agent or user invokes a wrapper.
-2. The wrapper normalizes the request and calls `latchkeyd exec`.
-3. `latchkeyd` loads the manifest and selected backend.
-4. `latchkeyd` verifies the wrapper path and hash.
-5. `latchkeyd` verifies the trusted binary path and hash.
-6. If a `lookupName` is configured, `latchkeyd` resolves it in `PATH` and rejects a mismatch.
-7. `latchkeyd` resolves only the approved named secret entries.
-8. `latchkeyd` injects only the approved env vars and launches the trusted binary.
-9. `latchkeyd` emits a local event without logging secret material.
+### `handoff`
 
-### Failure path
+What enters the child:
 
-If any trust, manifest, or backend check fails:
+- approved secret env vars at launch
+
+What the broker still controls:
+
+- pre-launch wrapper verification
+- pre-launch binary verification
+- policy scope
+- audit event emission
+
+What the broker stops controlling:
+
+- what the child does with the secret after launch
+
+### `oneshot`
+
+What enters the child:
+
+- approved secret env vars at launch
+
+What the broker still controls:
+
+- everything from `handoff`
+- a narrow first slice of long-lived argument rejection
+
+What the broker stops controlling:
+
+- post-handoff retention inside the child
+
+### `brokered`
+
+What enters the child:
+
+- session metadata only at launch
+
+What the broker still controls:
+
+- wrapper verification
+- binary verification
+- operation-set validation
+- live session checks
+- request-time allowlist enforcement
+- per-request audit events
+
+What the broker stops controlling:
+
+- same-user compromise outside its own trust boundary
+- universal tool semantics
+
+### `ephemeral`
+
+Planned mode.
+
+Intent:
+
+- hand the child a scoped short-lived credential instead of a longer-lived root secret
+
+### `proxy`
+
+Planned mode.
+
+Intent:
+
+- avoid direct raw secret visibility in the child for high-risk workflows
+
+## Control Flow
+
+### Handoff path
+
+1. A wrapper calls `latchkeyd exec`.
+2. `latchkeyd` loads the manifest and selected backend.
+3. `latchkeyd` verifies the wrapper path and hash.
+4. `latchkeyd` verifies the trusted binary path and hash.
+5. `latchkeyd` resolves only the approved named secret entries.
+6. `latchkeyd` injects only the approved env vars.
+7. `latchkeyd` launches the trusted binary.
+8. `latchkeyd` emits an audit event.
+
+### Brokered path
+
+1. A wrapper calls `latchkeyd exec` for a brokered policy.
+2. `latchkeyd` loads the manifest and verifies wrapper, binary, mode, and operation set.
+3. `latchkeyd` creates a local brokered session and Unix socket.
+4. `latchkeyd` launches the trusted child without raw secret env vars.
+5. The child receives only session metadata.
+6. The child requests an approved operation such as `secret.resolve`.
+7. The broker verifies session identity, operation allowlist, and secret binding.
+8. The broker returns the approved result and records audit events.
+
+## Failure Path
+
+If any trust, manifest, backend, mode, or brokered-session check fails:
 
 - return a structured error
 - record a denial or failure event
 - do not fall back to weaker behavior
 - do not release the secret
 
-## Operator model
+## Operator Model
 
 The operator loop is intentionally explicit:
 
 1. initialize the manifest
 2. refresh trust entries when expected local paths change
 3. verify trust state
-4. use wrappers for approved operations
-5. validate the workstation setup after changes
+4. choose the right mode for the task
+5. use wrappers for approved operations
+6. validate the workstation setup after changes
 
-That loop is part of the product. The project is not trying to hide trust decisions behind automatic repair.
+The project is not trying to hide trust decisions behind automatic repair.
 
-## Distribution shape
+## Distribution Shape
 
-The broker core is treated as a Swift command-line tool:
+The broker core is a Swift command-line tool:
 
 - source consumption via Swift Package Manager
 - local builds via `swift build`
 - tagged release artifacts via GitHub Releases
 - optional Homebrew distribution later
 
-The architecture should not assume package-registry publication for the broker core.
+## Portability Strategy
 
-## Portability strategy
-
-V1 is macOS-first because local secret-store integration is a core part of the value.
+V1 remains macOS-first because local secret-store integration is part of the value.
 
 Possible later backends:
 
 - Linux Secret Service
 - Windows Credential Manager
 
-Those are future extensions, not part of the current alpha contract.
+Those are future extensions, not part of the current contract.
 
-## Deliberately out of core
+## Deliberately Out Of Core
 
 - organization-specific policy
 - broad connector catalogs
-- UI/browser automation logic
+- UI or browser automation logic
 - generic auth discovery
-- large policy DSL work
+- giant policy DSL work
 - cloud control-plane assumptions
 
-The repo should expose auditable primitives, reference wrappers, and a clear trust model, not a giant policy platform.
+The repo should expose auditable primitives, reference wrappers, and clear trust boundaries, not a large policy platform.

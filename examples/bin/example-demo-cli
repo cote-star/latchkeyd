@@ -1,6 +1,121 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+session_socket="${LATCHKEYD_SESSION_SOCKET:-}"
+brokered_secret_name="example-token"
+brokered_operation="secret.resolve"
+passthrough_args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --brokered-operation)
+      brokered_operation="${2:-}"
+      shift 2
+      ;;
+    --secret-name)
+      brokered_secret_name="${2:-}"
+      shift 2
+      ;;
+    *)
+      passthrough_args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -n "${session_socket}" ]]; then
+  session_id="${LATCHKEYD_SESSION_ID:-}"
+  session_token="${LATCHKEYD_SESSION_TOKEN:-}"
+  policy_name="${LATCHKEYD_POLICY_NAME:-example-demo}"
+  policy_mode="${LATCHKEYD_POLICY_MODE:-brokered}"
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo '{"ok":false,"error":"python3 unavailable for brokered demo"}' >&2
+    exit 11
+  fi
+  python_args=("$session_socket" "$session_id" "$session_token" "$policy_name" "$policy_mode" "$brokered_secret_name" "$brokered_operation")
+  if [[ ${#passthrough_args[@]} -gt 0 ]]; then
+    python_args+=("${passthrough_args[@]}")
+  fi
+  python3 - "${python_args[@]}" <<'PY'
+import json
+import socket
+import sys
+
+def preview(value: str) -> str:
+    if len(value) <= 4:
+        return "***"
+    return value[:2] + "***" + value[-2:]
+
+_, socket_path, session_id, session_token, policy_name, policy_mode, secret_name, operation_name, *args = sys.argv
+if not socket_path:
+    print(json.dumps({"ok": False, "error": {"code": "BROKER_PROTOCOL_ERROR", "message": "session socket missing"}}))
+    sys.exit(1)
+
+request = {
+    "version": 1,
+    "sessionId": session_id,
+    "sessionToken": session_token,
+    "operation": operation_name,
+    "arguments": {
+        "secretName": secret_name
+    }
+}
+
+try:
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.connect(socket_path)
+        sock.sendall((json.dumps(request) + "\n").encode("utf-8"))
+        response_line = sock.makefile("r").readline()
+except Exception as exc:  # use a broad exception to catch socket errors
+    print(
+        json.dumps(
+            {
+                "ok": False,
+                "error": {
+                    "code": "BROKER_PROTOCOL_ERROR",
+                    "message": f"socket handshake failed: {exc}",
+                },
+            }
+        )
+    )
+    sys.exit(1)
+
+if not response_line:
+    print(json.dumps({"ok": False, "error": {"code": "BROKER_PROTOCOL_ERROR", "message": "empty response"}}))
+    sys.exit(1)
+
+response = json.loads(response_line)
+if not response.get("ok"):
+    print(json.dumps(response))
+    sys.exit(1)
+
+value = response["data"]["value"]
+brokered_result = {
+    "operation": response.get("operation", operation_name),
+    "secretName": response["data"]["secretName"],
+    "valuePreview": preview(value),
+    "valueLength": len(value),
+    "policyName": policy_name,
+    "policyMode": policy_mode,
+    "sessionId": session_id,
+}
+
+print(
+    json.dumps(
+        {
+            "ok": True,
+            "tool": "example-demo-cli",
+            "transport": "brokered",
+            "args": args,
+            "brokeredOperation": brokered_result,
+        },
+        separators=(",", ":"),
+    )
+)
+sys.exit(0)
+PY
+  exit $?
+fi
+
 token="${LATCHKEYD_EXAMPLE_TOKEN:-}"
 if [[ -z "${token}" ]]; then
   echo '{"ok":false,"error":"missing_demo_secret"}' >&2
@@ -15,13 +130,15 @@ preview() {
   printf '%s***%s' "${prefix}" "${suffix}"
 }
 
-printf '{"ok":true,"tool":"example-demo-cli","tokenPreview":"%s","tokenLength":%s,"args":[' "$(preview "${token}")" "${#token}"
+printf '{"ok":true,"tool":"example-demo-cli","transport":"handoff","tokenPreview":"%s","tokenLength":%s,"args":[' "$(preview "${token}")" "${#token}"
 first=1
-for arg in "$@"; do
-  if [[ ${first} -eq 0 ]]; then
-    printf ','
-  fi
-  printf '"%s"' "${arg//\"/\\\"}"
-  first=0
-done
+if [[ ${#passthrough_args[@]} -gt 0 ]]; then
+  for arg in "${passthrough_args[@]}"; do
+    if [[ ${first} -eq 0 ]]; then
+      printf ','
+    fi
+    printf '"%s"' "${arg//\"/\\\"}"
+    first=0
+  done
+fi
 printf ']}\n'

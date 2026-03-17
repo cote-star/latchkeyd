@@ -1,116 +1,108 @@
 # Roadmap
 
-## V0: Public Design Repo
+## Current Direction
+
+The repo has moved from “one explicit handoff model” toward “explicit, user-chosen trust posture per task.”
+
+That shift defines the next roadmap.
+
+## V1.4: Trust Modes
 
 Goal:
 
-- publish the concept, architecture, threat model, and examples
+- make mode a first-class part of the product story and the local manifest
 
 Deliverables:
 
-- polished README
-- architecture doc
-- threat model
-- extraction plan
-- example manifest
-- wrapper contract
+- explicit `mode` in policies
+- mode visibility in CLI output and event logs
+- tracked trust-mode docs
+- README and demo updates around mode choice
 
 Success criteria:
 
-- the repo communicates the idea clearly
-- the scope is credible
-- the threat model is honest
+- users can see which posture a task is using
+- docs no longer imply one universal execution model
 
-## V1: Minimal Working Broker
+## V1.5: Oneshot Hardening
 
 Goal:
 
-- ship a usable macOS-first broker with trust verification and one example exec path
+- move `oneshot` from a narrow heuristic slice toward a stronger bounded-run contract
 
 Deliverables:
 
-- broker binary
-- SwiftPM package layout
-- trust manifest refresh/status tool
-- example wrapper
-- example validation checks
+- stronger long-lived process detection
+- clearer policy and validation rules for bounded execution
+- more explicit denial cases for backgrounding or daemon-like behavior
 
 Success criteria:
 
-- verified trusted wrapper can launch a trusted CLI with injected secret
-- untrusted caller is denied
-- hash mismatch is denied
-- path hijack is denied
+- `oneshot` feels intentionally bounded, not just lightly filtered
 
-## V1.1: Swift Release Shape
+## V2.0: Brokered Expansion
 
 Goal:
 
-- make the broker easy to build, consume, and install as a Swift-native project
+- expand the current brokered first slice into a more complete request-time control model
 
 Deliverables:
 
-- `Package.swift`
-- reproducible local build instructions
-- tagged GitHub Release plan
-- artifact and checksum plan
+- richer brokered session handling
+- additional brokered operations beyond `secret.resolve`
+- stronger session binding and denial reporting
+- wrapper/client helper guidance
 
 Success criteria:
 
-- a user can build the broker with standard Swift tooling
-- a tagged release can produce installable binaries
-- the project clearly communicates SwiftPM as the primary source distribution path
+- `brokered` is useful for repeated bounded operations, not just a demo path
 
-## V1.2: Reference Wrapper Kit
+## V2.x: Ephemeral Backends
 
 Goal:
 
-- make it easier for others to build safe wrappers around their own tooling
+- support provider flows where a child can receive a short-lived scoped credential instead of a longer-lived secret
 
 Deliverables:
 
-- shell helper library
-- wrapper templates
-- discoverability conventions
-- error contract examples
+- credential-flow schema
+- provider-specific backend planning
+- lifetime-aware audit semantics
 
-## V1.3: Local Observability
+Success criteria:
+
+- the repo can support short-lived credential paths without pretending every backend works the same way
+
+## V3.0: Proxy / Secretless Capability Paths
 
 Goal:
 
-- show why something was denied and help users debug trust drift
+- support the highest-trust posture for workflows that should not expose raw secret material to the child at all
 
 Deliverables:
 
-- JSONL event sink
-- compact local query helper
-- drift-focused validation output
+- capability-oriented request model
+- secretless or delegated operation path
+- wrapper guidance for proxy mode
 
-## V2: Portable Secret Backends
+Success criteria:
 
-Goal:
+- the strongest mode has a clear, bounded operator story
 
-- expand beyond macOS-first installations
+## Supporting Tracks
 
-Deliverables:
+### Distribution
 
-- backend abstraction
-- Linux and Windows backend plans
-- compatibility matrix
+- SwiftPM remains the primary source distribution path
+- GitHub Releases remain the artifact path
+- Homebrew can come later if it does not distort the core shape
 
-## V3: Community Hardening
-
-Goal:
-
-- turn the project from a personal extraction into a durable open-source tool
-
-Deliverables:
+### Community Hardening
 
 - contribution guide
-- test matrix
-- GitHub Release automation
-- optional Homebrew packaging
-- reference integrations
+- wider test matrix
+- release automation hardening
+- more reference wrappers
 
 ## What Not To Do Too Early
 
@@ -118,4 +110,4 @@ Deliverables:
 - ship dozens of connectors
 - overfit to one editor or one agent
 - overpromise security guarantees
-- force a Swift-native broker into npm/crates/PyPI release workflows
+- force a Swift-native broker into registry-first release workflows

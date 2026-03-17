@@ -2,13 +2,14 @@
 
 ## Short Post
 
-Open-sourced `latchkeyd`: a local trust gate for agent workflows.
+Open-sourced `latchkeyd`: a macOS local trust broker for agent workflows.
 
-If you use local coding agents with real credentials, `latchkeyd` gives you a narrower handoff:
+If you use local coding agents with real credentials, `latchkeyd` lets you choose the trust posture before a local tool gets access:
 
 - secrets stay local
 - wrappers and binaries are trust-pinned
 - drift, hijack, and bypass fail closed
+- mode choice is explicit
 
 Repo:
 
@@ -16,36 +17,59 @@ Repo:
 
 ## Medium Post
 
-Local coding agents are useful right up until they get broad access to real credentials.
+Local coding agents are useful right up until credential handoff becomes broad, ambient, and hard to reason about.
 
-`latchkeyd` is a local trust gate and secret broker for that problem:
+`latchkeyd` is a local trust broker for that problem:
 
 - secrets stay local
 - wrappers and binaries are trust-pinned
-- secret release is explicit
+- the trust posture is explicit
 - drift, hijack, and bypass fail closed
 
-It is not a sandbox, not full endpoint security, and not "secure agents solved."
+The current direction is no longer just “explicit handoff before execution.”
+
+It is:
+
+- explicit, user-chosen trust posture per task
+
+The repo now has a trust-mode family:
+
+- `handoff`
+- `oneshot`
+- `brokered`
+- future `ephemeral`
+- future `proxy`
+
+This release narrows credential handoff. It does not claim full confinement after handoff.
+
+It is not:
+
+- a sandbox
+- full endpoint security
+- same-user compromise protection
+- universal prompt-injection prevention
 
 It is a narrower, more auditable way to let local agents use real tools with real credentials on a developer workstation.
 
-Current alpha includes:
+Current repo scope includes:
 
 - Swift CLI broker
 - manifest-driven trust model
+- explicit policy modes
 - file and keychain backends
-- example wrapper and demo CLI
+- reference wrapper and demo CLI
 - validation tooling
 - local JSONL event logs
+- offline and release-parity proof scripts
 
 ## Launch Thread Skeleton
 
 1. Problem:
    local agents usually get either too little access to help or too much access to trust.
 2. Mechanism:
-   wrapper -> `latchkeyd` -> trusted tool, with explicit secret handoff.
+   wrapper -> local trust broker -> trusted tool, with explicit mode choice.
 3. Proof:
-   before/after hero plus denial demos.
+   hero asset, trusted handoff demo, denied handoff demo, brokered request demo.
 4. Limits:
    not a sandbox, not same-user compromise protection, not universal prompt-injection prevention.
 5. Close:

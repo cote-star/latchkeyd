@@ -61,10 +61,13 @@ public struct EventLogger {
         result: String,
         reason: String? = nil,
         backendType: BackendType? = nil,
+        policyMode: ExecMode? = nil,
         wrapperName: String? = nil,
         wrapperPath: String? = nil,
         binaryName: String? = nil,
-        binaryPath: String? = nil
+        binaryPath: String? = nil,
+        sessionId: String? = nil,
+        operationName: String? = nil
     ) throws {
         try prepare()
 
@@ -77,7 +80,10 @@ public struct EventLogger {
             wrapperName: wrapperName,
             wrapperPath: wrapperPath,
             binaryName: binaryName,
-            binaryPath: binaryPath
+            binaryPath: binaryPath,
+            policyMode: policyMode?.rawValue,
+            sessionId: sessionId,
+            operationName: operationName
         )
 
         let encoder = JSONEncoder()

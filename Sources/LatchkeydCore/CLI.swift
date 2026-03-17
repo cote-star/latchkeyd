@@ -24,7 +24,9 @@ public struct CLI {
                         "version": .string(latchkeydVersion),
                         "manifestPath": .string(parsed.manifestURL.path),
                         "supportDirectory": .string(appPaths.supportDirectory.path),
-                        "eventsPath": .string(appPaths.eventsURL.path)
+                        "eventsPath": .string(appPaths.eventsURL.path),
+                        "supportedModes": .array(ExecMode.allCases.map { .string($0.rawValue) }),
+                        "brokeredProtocolVersion": .int(1)
                     ]
                 )
                 try writeJSON(output, to: context.standardOutput)

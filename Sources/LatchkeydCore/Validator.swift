@@ -31,6 +31,11 @@ public struct Validator {
         try runWrapperDemo(manifest: manifest)
         results.append(ValidationItem(name: "example-wrapper:demo", ok: true, message: "demo succeeded"))
 
+        if manifest.execPolicies["example-brokered"] != nil {
+            try runBrokeredWrapperDemo(manifest: manifest)
+            results.append(ValidationItem(name: "example-wrapper:brokered-demo", ok: true, message: "brokered demo succeeded"))
+        }
+
         try runDeniedScenario(selfExecutablePath: selfExecutablePath)
         results.append(ValidationItem(name: "denial:untrusted-caller", ok: true, message: "denial confirmed"))
 
@@ -70,6 +75,23 @@ public struct Validator {
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             throw LatchkeydError.execution("Example wrapper demo failed.", process.terminationStatus)
+        }
+    }
+
+    private func runBrokeredWrapperDemo(manifest: Manifest) throws {
+        guard let wrapper = manifest.wrappers["example-wrapper"] else {
+            throw LatchkeydError.manifest("Validation requires the `example-wrapper` manifest entry.")
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [canonicalPath(wrapper.path), "brokered-demo", "--manifest", manifestURL.path]
+        process.environment = environment.merging(["LATCHKEYD_BIN": canonicalPath(selfExecutablePath())]) { _, new in new }
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw LatchkeydError.execution("Example wrapper brokered demo failed.", process.terminationStatus)
         }
     }
 

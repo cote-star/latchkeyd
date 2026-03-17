@@ -4,9 +4,9 @@
 
 Reduce accidental overexposure of local credentials in agent-assisted development workflows.
 
-`latchkeyd` is meant to narrow the trust boundary around approved local tool execution. It is not meant to claim total workstation security.
+`latchkeyd` narrows the trust boundary around approved local tool execution. It does not claim total workstation security.
 
-## What the project is trying to reduce
+## What The Project Is Trying To Reduce
 
 ### 1. Prompt-driven tool misuse
 
@@ -44,7 +44,7 @@ A wrapper or workflow falls back to:
 - browser interaction
 - looser auth paths
 
-The intended `latchkeyd` posture is fail closed instead.
+The intended posture is fail closed instead.
 
 ### 5. Prompt-injection fallout
 
@@ -53,11 +53,30 @@ Remote content may influence an agent to attempt sensitive local actions.
 `latchkeyd` does not prevent the model from producing a bad idea. What it does is reduce the chance that a bad idea automatically turns into broad credential exposure:
 
 - wrappers stay narrow
-- secret release is explicit
+- release is explicit
 - both wrapper and binary are verified
 - broad inherited env state is avoided
 
-## What the project does not solve
+## Threat Reduction By Mode
+
+Different modes reduce different risks. They should not be treated as interchangeable.
+
+| Threat | `handoff` | `oneshot` | `brokered` | `ephemeral` | `proxy` |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| ambient credential sprawl | reduced | reduced | strongly reduced | strongly reduced | strongly reduced |
+| wrapper drift | reduced | reduced | reduced | reduced | reduced |
+| PATH hijack | reduced | reduced | reduced | reduced | reduced |
+| post-handoff secret retention | not reduced | weakly reduced | partly reduced | partly reduced | strongly reduced |
+| same-user compromise | not solved | not solved | not solved | not solved | not solved |
+| universal prompt-injection prevention | not solved | not solved | not solved | not solved | not solved |
+
+Read that table literally:
+
+- `handoff` and `oneshot` are pre-execution trust controls
+- `brokered` adds request-time control
+- `ephemeral` and `proxy` are future stricter models
+
+## What The Project Does Not Solve
 
 ### 1. Same-user compromise
 
@@ -79,9 +98,9 @@ This project is not a VM, container runtime, sandbox, or MAC framework.
 
 ### 5. Safe autonomous agents as a general claim
 
-The project should never be presented as "secure agents solved."
+The project should never be presented as “secure agents solved.”
 
-## Deployment assumption
+## Deployment Assumption
 
 The default audience is a single-user developer workstation where:
 
@@ -89,16 +108,17 @@ The default audience is a single-user developer workstation where:
 - the operator accepts local trust-pinning and fail-closed behavior
 - stronger isolation, when needed, is handled outside the project
 
-## Security principles
+## Security Principles
 
 - no generic secret fetch
 - narrow command surface
 - explicit trust roots
 - no silent auth fallback
-- secret release only after caller and callee verification
+- release only after caller and callee verification
 - local operator control over trust refresh
+- mode-specific guarantees instead of one fuzzy security promise
 
-## Safe framing for open source
+## Safe Framing For Open Source
 
 The project should be framed as:
 
@@ -106,6 +126,7 @@ The project should be framed as:
 - explicit trust mediation for approved workflows
 - practical defense in depth for single-user workstations
 - a local-first response to credential sprawl in agent workflows
+- a system where the operator chooses the trust posture per task
 
 The project should not be framed as:
 

@@ -85,6 +85,7 @@ public struct Manifest: Codable {
     public var wrappers: [String: TrustedPath]
     public var binaries: [String: TrustedBinary]
     public let secrets: [String: SecretSpec]
+    public let operationSets: [String: OperationSet]?
     public let execPolicies: [String: ExecPolicy]
 
     public init(
@@ -94,6 +95,7 @@ public struct Manifest: Codable {
         wrappers: [String: TrustedPath],
         binaries: [String: TrustedBinary],
         secrets: [String: SecretSpec],
+        operationSets: [String: OperationSet]? = nil,
         execPolicies: [String: ExecPolicy]
     ) {
         self.version = version
@@ -102,6 +104,7 @@ public struct Manifest: Codable {
         self.wrappers = wrappers
         self.binaries = binaries
         self.secrets = secrets
+        self.operationSets = operationSets
         self.execPolicies = execPolicies
     }
 }
@@ -123,6 +126,14 @@ public struct SecretBackendConfig: Codable, Equatable {
 public enum BackendType: String, Codable {
     case keychain
     case file
+}
+
+public enum ExecMode: String, Codable, CaseIterable {
+    case handoff
+    case oneshot
+    case brokered
+    case ephemeral
+    case proxy
 }
 
 public struct TrustedPath: Codable, Equatable {
@@ -160,17 +171,81 @@ public struct SecretSpec: Codable, Equatable {
 }
 
 public struct ExecPolicy: Codable, Equatable {
+    public let mode: ExecMode
     public let wrapper: String
     public let binary: String
     public let secrets: [String]
+    public let operationSet: String?
     public let description: String?
 
-    public init(wrapper: String, binary: String, secrets: [String], description: String? = nil) {
+    public init(
+        mode: ExecMode = .handoff,
+        wrapper: String,
+        binary: String,
+        secrets: [String],
+        operationSet: String? = nil,
+        description: String? = nil
+    ) {
+        self.mode = mode
         self.wrapper = wrapper
         self.binary = binary
         self.secrets = secrets
+        self.operationSet = operationSet
         self.description = description
     }
+
+    enum CodingKeys: String, CodingKey {
+        case mode
+        case wrapper
+        case binary
+        case secrets
+        case operationSet
+        case description
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        mode = try container.decodeIfPresent(ExecMode.self, forKey: .mode) ?? .handoff
+        wrapper = try container.decode(String.self, forKey: .wrapper)
+        binary = try container.decode(String.self, forKey: .binary)
+        secrets = try container.decode([String].self, forKey: .secrets)
+        operationSet = try container.decodeIfPresent(String.self, forKey: .operationSet)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(mode, forKey: .mode)
+        try container.encode(wrapper, forKey: .wrapper)
+        try container.encode(binary, forKey: .binary)
+        try container.encode(secrets, forKey: .secrets)
+        try container.encodeIfPresent(operationSet, forKey: .operationSet)
+        try container.encodeIfPresent(description, forKey: .description)
+    }
+}
+
+public struct OperationSet: Codable, Equatable {
+    public let operations: [OperationDefinition]
+
+    public init(operations: [OperationDefinition]) {
+        self.operations = operations
+    }
+}
+
+public struct OperationDefinition: Codable, Equatable {
+    public let name: OperationName
+    public let allowedSecrets: [String]
+    public let allowedResponseFields: [String]?
+
+    public init(name: OperationName, allowedSecrets: [String], allowedResponseFields: [String]? = nil) {
+        self.name = name
+        self.allowedSecrets = allowedSecrets
+        self.allowedResponseFields = allowedResponseFields
+    }
+}
+
+public enum OperationName: String, Codable {
+    case secretResolve = "secret.resolve"
 }
 
 public struct EventRecord: Codable {
@@ -183,6 +258,9 @@ public struct EventRecord: Codable {
     public let wrapperPath: String?
     public let binaryName: String?
     public let binaryPath: String?
+    public let policyMode: String?
+    public let sessionId: String?
+    public let operationName: String?
 }
 
 public struct ValidationItem: Codable {

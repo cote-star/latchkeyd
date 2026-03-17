@@ -5,17 +5,23 @@
 ![Version](https://img.shields.io/badge/version-0.1.0--alpha.3-green.svg)
 [![Star History](https://img.shields.io/github/stars/cote-star/latchkeyd?style=social)](https://github.com/cote-star/latchkeyd)
 
-**Keep secrets local. Approve the handoff.**
+**Choose the trust posture before a local tool gets credential-backed access.**
 
-Let local agents use real tools without turning your shell into a generic credential vending machine.
+`latchkeyd` is a macOS local trust broker for agent-mediated tool execution. It keeps secrets local, pins the wrapper and binary that are allowed to use them, and lets you decide whether a task should use direct handoff, a bounded one-shot path, or a brokered request path.
 
-> If you use local coding agents with real credentials, `latchkeyd` gives you a narrower, auditable trust gate between wrapper and tool.
+> If you use local coding agents with real credentials, `latchkeyd` gives you a narrower, evidence-backed trust boundary between wrapper and tool.
 
 ![latchkeyd before and after](docs/assets/before-after-anim.webp)
 
 ```bash
-LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper demo
+LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper brokered-demo
 ```
+
+Proof:
+
+- current public release: `v0.1.0-alpha.3`
+- hosted CI and hosted release workflows are live in the repo
+- published binary and checksum are part of the release shape
 
 **Two problems, one tool:**
 
@@ -29,41 +35,102 @@ LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper demo
 - secret release is explicit
 - drift, hijack, and bypass fail closed
 
+## Choose Your Trust Mode
+
+The repo is moving from one execution model to a small family of explicit trust postures.
+
+| Mode | Best for | What the child receives | Main limit | Current state |
+| :--- | :--- | :--- | :--- | :--- |
+| `handoff` | maximum compatibility with existing tools | approved env vars at launch | child can retain or re-export the secret | shipped |
+| `oneshot` | bounded publish or release commands | approved env vars for one short-lived run | still visible to that command while it runs | shipped as first slice |
+| `brokered` | per-operation control and tighter request boundaries | session metadata at launch, secret only on approved request | first slice is narrow and not same-user isolation | shipped as first slice in the repo |
+| `ephemeral` | provider flows that support short-lived credentials | scoped short-lived credentials | depends on provider support | planned |
+| `proxy` | highest-risk or secretless workflows | capability access without raw secret handoff | highest implementation complexity | planned |
+
+This is the main product shift:
+
+- from explicit handoff before execution
+- to explicit, user-chosen trust posture per task
+
 ## See It In Action
 
-### The Trusted Handoff
+### Approved Handoff
 
 Build, initialize trust, run the wrapper, validate the workstation:
 
 ![Happy path terminal](docs/assets/terminal-happy-path.webp)
 
-### The Denied Handoff
+This demonstrates the classic `handoff` path: wrapper and binary are verified, one approved env var is injected, and the tool proves it received access without printing the raw secret.
+
+### Denied Handoff
 
 Put the wrong binary in `PATH` and the broker rejects it instead of handing over the secret:
 
 ![Trust denial terminal](docs/assets/terminal-denial.webp)
 
+This demonstrates the fail-closed trust story: a name match is not trust, and no secret is released when the binary path or hash is wrong.
+
 More walkthroughs:
 
 - [`docs/demos/HAPPY_PATH.md`](docs/demos/HAPPY_PATH.md)
 - [`docs/demos/TRUST_FAILURES.md`](docs/demos/TRUST_FAILURES.md)
+- [`docs/demos/MODE_SELECTION.md`](docs/demos/MODE_SELECTION.md)
 
-## What You Get Back
+## Current Guarantee
 
-The manifest, status, validate, and error flows emit structured JSON that is safe to inspect, script, or log; `exec` delegations inherit stdout/stderr from the trusted child, so review child output before relying on its format.
+`latchkeyd` currently guarantees:
 
-Event logging is part of the enforced audit contract for brokered operations: `latchkeyd` preflights the event log path before `exec` and `validate`, and it returns `LOGGING_ERROR` if audit logging is unavailable up front or fails while recording the outcome.
+- the selected policy mode is explicit in the manifest
+- the wrapper asking for access is trust-pinned
+- the downstream binary is trust-pinned
+- only policy-approved secret names or brokered operations are allowed
+- drift, hijack, and bypass fail closed
+- brokered operations are audited, and logging failure is an explicit error
+
+## Not Guaranteed After Handoff
+
+`handoff` and `oneshot` do not confine a trusted child after it receives secret material.
+
+That means:
+
+- the child can still retain or re-export the secret while it runs
+- `oneshot` narrows lifetime intent, not post-handoff control
+- the first brokered slice narrows request boundaries, but it is not same-user isolation
+
+This repo should be read as practical defense in depth for approved local workflows, not “secure agents solved.”
+
+## Structured Output And Audit Contract
+
+`status`, `manifest` commands, `validate`, and structured errors emit JSON that is safe to inspect, script, or log.
+
+`exec` inherits stdout and stderr from the trusted child. Review child output before relying on its shape.
+
+Event logging is part of the enforced audit contract:
+
+- `exec` and `validate` preflight the event log path
+- `LOGGING_ERROR` is returned if audit logging is unavailable up front
+- `LOGGING_ERROR` is also returned if the log append fails after command processing has started
+
+Example child output:
 
 ```json
 {
   "ok": true,
   "tool": "example-demo-cli",
-  "tokenPreview": "la***en",
-  "tokenLength": 19
+  "transport": "brokered",
+  "args": [
+    "smoke"
+  ],
+  "brokeredOperation": {
+    "operation": "secret.resolve",
+    "secretName": "example-token",
+    "valuePreview": "la***en",
+    "valueLength": 19,
+    "policyName": "example-brokered",
+    "policyMode": "brokered"
+  }
 }
 ```
-
-Trusted wrapper, trusted binary, scoped handoff. The reference demo CLI avoids printing raw secrets, but a trusted child process controls what appears on the terminal, so keep wrapper logic intentional.
 
 ## Quick Start
 
@@ -80,16 +147,28 @@ swift build
 ./.build/debug/latchkeyd manifest refresh
 ```
 
-### 3. Run the example wrapper
+### 3. Run the handoff example
 
 ```bash
 LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper demo
 ```
 
-### 4. Validate the setup
+### 4. Run the brokered example
+
+```bash
+LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper brokered-demo
+```
+
+### 5. Validate the setup
 
 ```bash
 LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./.build/debug/latchkeyd validate
+```
+
+### 6. Optional: prove the core path works offline
+
+```bash
+./scripts/offline_smoke.sh
 ```
 
 The example setup uses:
@@ -107,23 +186,28 @@ Most local agent setups end up with one of two bad patterns:
 - broad inherited env state that every tool can see
 - wrapper scripts that assume the tool name alone is enough to trust
 
-`latchkeyd` exists to put a local trust check in the middle of that flow.
+`latchkeyd` exists to put a local trust check in the middle of that flow and let the operator choose how narrow the release path should be.
 
 ## What It Is
 
-`latchkeyd` is a macOS-first local broker for secret-scoped tool execution. It verifies:
+`latchkeyd` is a macOS-first local trust broker for secret-scoped tool execution. It verifies:
 
 - the wrapper asking for access
 - the downstream binary that would receive access
-- the manifest policy that allows that handoff
+- the manifest policy that allows that access
+- the trust mode attached to that policy
 
-Then it injects only the named environment variables approved for that exact action and `exec`s the trusted command.
+Depending on the mode, it either:
+
+- injects approved env vars and launches the tool
+- enforces a bounded one-shot path
+- or creates a brokered local session so the child can request an approved operation later
 
 ## What Makes It Different
 
 - local-first: no cloud control plane required
 - your system, your rules: trust is defined by the local manifest you control
-- explicit secret handoff: there is no generic "fetch me any secret" API
+- user-owned trust posture: choose compatibility, bounded execution, or request-time brokerage by task
 - trust-pinned execution: both wrapper and binary are verified
 - fail closed on drift: path changes, hash changes, and hijacks stop the run
 - built for agent workflows: this is about safer local tool use, not generic app configuration
@@ -139,7 +223,7 @@ If the safety story depends on a cloud broker, remote policy service, or hosted 
 - the handoff policy is local
 - the operator can inspect the actual trusted paths and hashes
 
-That makes the system easier to reason about for a single-user macOS workstation and reduces reliance on cloud-side assumptions. Offline operation is supported because every run reads local manifest/event files and negotiates with local binaries; no external service is consulted, and the dedicated `scripts/offline_smoke.sh` proves that happy-path commands run with every proxy pointing at invalid endpoints.
+Offline operation is supported because every run reads local manifest and event files and negotiates with local binaries. The dedicated `scripts/offline_smoke.sh` proves that the core path works with every proxy pointed at invalid endpoints.
 
 ## How This Helps With Prompt-Injection Fallout
 
@@ -149,7 +233,7 @@ What `latchkeyd` does is narrow the blast radius once an agent is already allowe
 
 - remote content cannot directly get secrets just by influencing model output
 - wrappers can remain small, explicit, and purpose-built
-- broad inherited env state is replaced with explicit handoff
+- broad inherited env state is replaced with explicit handoff or explicit brokered request boundaries
 - a tool name alone is not trusted; the real path and hash must match
 
 ![latchkeyd attack surface protection](docs/assets/attack-surface-anim.webp?v=2)
@@ -158,25 +242,28 @@ This is defense in depth for approved local workflows, not a blanket claim of se
 
 ## How It Works
 
+### Handoff And Oneshot
+
 1. The agent calls a wrapper.
 2. The wrapper normalizes the request and calls `latchkeyd`.
 3. `latchkeyd` verifies the trusted wrapper path and hash.
 4. `latchkeyd` verifies the trusted downstream binary path and hash.
 5. `latchkeyd` resolves only the secret entries approved by policy.
-6. `latchkeyd` injects only the approved environment variables and `exec`s the command.
+6. `latchkeyd` injects only the approved env vars and launches the command.
+
+### Brokered
+
+1. The agent calls a wrapper.
+2. The wrapper calls `latchkeyd exec` for a brokered policy.
+3. `latchkeyd` verifies the wrapper, binary, policy, and operation set.
+4. `latchkeyd` launches the child without raw secret env vars.
+5. The child receives only session metadata.
+6. The child asks the broker for an approved operation such as `secret.resolve`.
+7. The broker checks the live session, operation allowlist, and secret binding before returning a result.
 
 ![Architecture flow](docs/assets/architecture-flow.png?v=2)
 
-**Tenets:**
-
-- **Local-first**: the trust root, manifest, and secret backend stay on the workstation you control.
-- **Fail-closed**: drift, hijack, and bypass stop the run instead of silently weakening policy.
-- **Wrapper-first**: wrappers stay small and explicit; they do not become secret fetchers.
-- **Operator-readable**: paths, hashes, and event logs are inspectable without a cloud control plane.
-
 ## Trust Failures You Should Expect
-
-The alpha is meant to make trust failure obvious and reproducible.
 
 Examples:
 
@@ -184,12 +271,13 @@ Examples:
 - prepend a fake `example-demo-cli` earlier in `PATH` to trigger PATH hijack denial
 - call `latchkeyd exec` directly with an untrusted `--caller` path to trigger caller denial
 - point the file backend at a missing file to trigger backend configuration denial
+- request an unsupported brokered operation to trigger `OPERATION_NOT_ALLOWED`
 
 ## Operator Recovery Path
 
 When trust checks fail, the intended operator loop is simple:
 
-1. inspect the failing wrapper, binary, or backend path
+1. inspect the failing wrapper, binary, backend path, or brokered operation
 2. decide whether the change is expected
 3. if it is expected, re-pin with `latchkeyd manifest refresh`
 4. if it is not expected, stop and investigate instead of weakening the policy
@@ -204,14 +292,11 @@ The secure path should be the shortest path, but it should never silently self-h
 | **Wrapper trust-pinning** | Yes | No | Varies |
 | **Binary trust-pinning** | Yes | No | Varies |
 | **Fail-closed on drift** | Yes | No | Policy-dependent |
-| **Works offline** | Yes (`scripts/offline_smoke.sh` proves the core happy path) | Yes | No |
-| **Local operator can inspect trust root** | Yes | Partial | No |
+| **Works offline** | Yes (`scripts/offline_smoke.sh` proves the core path) | Yes | No |
+| **Operator can inspect the trust root** | Yes | Partial | No |
+| **Mode-specific trust posture** | Yes | No | Varies |
 
 ## Public Command Surface
-
-GitHub Actions CI and release workflows exist in the repository, but they are not re-run locally as part of this review. The hosted workflows are still the signal that gates every public release candidate, so run them on the release branch/tag before announcing the alpha.
-
-The core build, test, validate, and packaging steps can be mirrored locally with `scripts/local_workflow_parity.sh`, and the offline smoke proof in `scripts/offline_smoke.sh` keeps every proxy pointing to invalid addresses to prove `manifest init`, `refresh`, `verify`, wrapper demo, and `validate` succeed without network dependencies.
 
 - `latchkeyd status`
 - `latchkeyd manifest init`
@@ -228,8 +313,6 @@ Default event log path:
 
 - `~/Library/Application Support/latchkeyd/events.jsonl`
 
-`exec` and `validate` preflight this file before they begin brokered work, and manifest lifecycle commands also return `LOGGING_ERROR` if the audit log cannot be created or appended. Fix the log path before retrying instead of accepting an unaudited run.
-
 Use `--manifest PATH` to override the manifest location.
 
 ## Current Alpha Scope
@@ -237,21 +320,28 @@ Use `--manifest PATH` to override the manifest location.
 Current alpha scope:
 
 - macOS-only SwiftPM package with a real `latchkeyd` CLI
-- manifest init, refresh, verify, exec, and validate commands
+- versioned trust manifests with explicit policy modes
+- `handoff`, `oneshot`, and a first brokered slice
 - `file` and `keychain` secret backends
 - a reference Bash wrapper plus a harmless demo CLI
-- JSONL event logging with enforced audit preflight and `LOGGING_ERROR` failures
+- JSONL event logging with enforced audit preflight and `LOGGING_ERROR`
 - `scripts/offline_smoke.sh` for dedicated offline proof
 - `scripts/local_workflow_parity.sh` for local release-prep parity
-- GitHub Actions CI and release workflows (hosted runs still required before cutting a public tag)
+- GitHub Actions CI and release workflows
 
-Intentional non-goals for this alpha:
+Accepted limits for this alpha:
 
-- long-running daemon mode
-- provider-specific integrations
-- HTTP-specific broker commands
-- cross-platform backends
-- signing and notarization
+- no long-running daemon mode
+- no provider-specific integrations yet
+- no same-user compromise claim
+- no full secretless capability model yet
+- no cross-platform backend story yet
+
+## What Comes Next
+
+- stronger `oneshot` lifetime enforcement
+- broader `brokered` operations and session controls
+- `ephemeral` and `proxy` modes for stricter workflows
 
 ## Who This Is For
 
@@ -274,6 +364,10 @@ This project should be understood as local defense in depth for approved workflo
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- [`docs/TRUST_MODES_SPEC.md`](docs/TRUST_MODES_SPEC.md)
+- [`docs/MANIFEST_EVOLUTION_SPEC.md`](docs/MANIFEST_EVOLUTION_SPEC.md)
+- [`docs/CLI_MODE_UX_SPEC.md`](docs/CLI_MODE_UX_SPEC.md)
+- [`docs/WRAPPER_MODE_GUIDE.md`](docs/WRAPPER_MODE_GUIDE.md)
 - [`examples/wrapper-contract.md`](examples/wrapper-contract.md)
 
 ## Release Shape
@@ -292,7 +386,7 @@ Later possibilities:
 - signed and notarized binaries
 - broader wrapper ecosystem
 
-Release candidates must run `scripts/local_workflow_parity.sh` and `scripts/offline_smoke.sh` locally to prove the full command surface before cutting a tag, but the hosted GitHub release workflow is still the authoritative gate for every public asset.
+Release candidates should pass `scripts/local_workflow_parity.sh` and `scripts/offline_smoke.sh` locally before cutting a tag, but the hosted GitHub release workflow remains the authoritative gate for public assets.
 
 ## Project Support
 
@@ -302,4 +396,4 @@ Release candidates must run `scripts/local_workflow_parity.sh` and `scripts/offl
 
 ## One-Line Summary
 
-`latchkeyd` gives local agents a narrower, auditable, fail-closed way to use real tools with real credentials.
+`latchkeyd` gives local agents a narrower, auditable, fail-closed way to use real tools with real credentials while letting the operator choose the trust posture per task.

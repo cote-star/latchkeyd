@@ -30,6 +30,7 @@ public struct BrokerService {
         var wrapperPath: String?
         var binaryName: String?
         var binaryPath: String?
+        var policyMode: ExecMode?
         try logger.prepare()
 
         do {
@@ -43,8 +44,19 @@ public struct BrokerService {
                 throw LatchkeydError.manifest("Exec policy `\(request.policyName)` references unknown binary `\(policy.binary)`.")
             }
 
+            let effectiveMode = effectiveMode(for: policy, policyName: request.policyName)
+            policyMode = effectiveMode
+
+            if effectiveMode == .oneshot, let rejectedArgument = rejectedOneshotArgument(in: request.arguments) {
+                throw LatchkeydError.usage(
+                    "Exec policy `\(request.policyName)` uses oneshot mode and rejects long-lived argument `\(rejectedArgument)`."
+                )
+            }
+
             wrapperName = policy.wrapper
             binaryName = policy.binary
+
+            try ensureOneshotCompliance(mode: effectiveMode, request: request)
 
             let callerPath = canonicalPath(request.callerPath)
             let trustedWrapperPath = canonicalPath(trustedWrapper.path)
@@ -87,6 +99,21 @@ public struct BrokerService {
                 }
             }
 
+            if effectiveMode == .brokered {
+                let status = try executeBrokered(
+                    request: request,
+                    policy: policy,
+                    mode: effectiveMode,
+                    trustedWrapperPath: trustedWrapperPath,
+                    trustedBinaryPath: trustedBinaryPath
+                )
+                return status
+            }
+
+            if effectiveMode == .ephemeral || effectiveMode == .proxy {
+                throw LatchkeydError.usage("Exec policy `\(request.policyName)` uses mode `\(effectiveMode.rawValue)`, which is not implemented yet.")
+            }
+
             var childEnvironment = environment
             for secretName in policy.secrets {
                 guard let secret = manifest.secrets[secretName] else {
@@ -111,6 +138,7 @@ public struct BrokerService {
                     command: "exec",
                     result: "ok",
                     backendType: backend.type,
+                    policyMode: effectiveMode,
                     wrapperName: policy.wrapper,
                     wrapperPath: trustedWrapperPath,
                     binaryName: policy.binary,
@@ -122,6 +150,7 @@ public struct BrokerService {
                     result: "failed",
                     reason: "child_exit_\(process.terminationStatus)",
                     backendType: backend.type,
+                    policyMode: effectiveMode,
                     wrapperName: wrapperName,
                     wrapperPath: trustedWrapperPath,
                     binaryName: binaryName,
@@ -137,6 +166,7 @@ public struct BrokerService {
                     result: logShape.result,
                     reason: logShape.reason,
                     backendType: backend.type,
+                    policyMode: policyMode ?? manifest.execPolicies[request.policyName]?.mode,
                     wrapperName: wrapperName,
                     wrapperPath: wrapperPath,
                     binaryName: binaryName,
@@ -157,6 +187,7 @@ public struct BrokerService {
                     result: "failed",
                     reason: "unexpected_error",
                     backendType: backend.type,
+                    policyMode: policyMode ?? manifest.execPolicies[request.policyName]?.mode,
                     wrapperName: wrapperName,
                     wrapperPath: wrapperPath,
                     binaryName: binaryName,
@@ -167,6 +198,85 @@ public struct BrokerService {
             }
             throw executionError
         }
+    }
+
+    private func executeBrokered(
+        request: ExecRequest,
+        policy: ExecPolicy,
+        mode: ExecMode,
+        trustedWrapperPath: String,
+        trustedBinaryPath: String
+    ) throws -> Int32 {
+        let session = try BrokeredSessionServer(
+            manifest: manifest,
+            policyName: request.policyName,
+            policy: policy,
+            backend: backend,
+            logger: logger,
+            wrapperName: policy.wrapper,
+            wrapperPath: trustedWrapperPath,
+            binaryName: policy.binary,
+            binaryPath: trustedBinaryPath
+        )
+        try session.start()
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: trustedBinaryPath)
+        process.arguments = request.arguments
+        process.environment = environment.merging(session.environment) { _, new in new }
+        process.standardOutput = FileHandle.standardOutput
+        process.standardError = FileHandle.standardError
+        process.standardInput = FileHandle.standardInput
+
+        do {
+            try process.run()
+        } catch {
+            try? session.stop(reason: "launch_failed")
+            throw LatchkeydError.execution(
+                "Failed to launch trusted binary `\(trustedBinaryPath)`: \(error.localizedDescription)",
+                nil
+            )
+        }
+
+        try session.attachChild(pid: process.processIdentifier)
+        process.waitUntilExit()
+
+        do {
+            try session.stop(reason: "terminated")
+        } catch let loggingError as LatchkeydError {
+            throw enrichLoggingError(loggingError, command: "exec", originalError: .execution("Brokered session teardown failed.", process.terminationStatus))
+        }
+
+        try session.rethrowFatalErrorIfNeeded()
+
+        if process.terminationStatus == 0 {
+            try logger.log(
+                command: "exec",
+                result: "ok",
+                backendType: backend.type,
+                policyMode: mode,
+                wrapperName: policy.wrapper,
+                wrapperPath: trustedWrapperPath,
+                binaryName: policy.binary,
+                binaryPath: trustedBinaryPath,
+                sessionId: session.sessionId
+            )
+        } else {
+            try logger.log(
+                command: "exec",
+                result: "failed",
+                reason: "child_exit_\(process.terminationStatus)",
+                backendType: backend.type,
+                policyMode: mode,
+                wrapperName: policy.wrapper,
+                wrapperPath: trustedWrapperPath,
+                binaryName: policy.binary,
+                binaryPath: trustedBinaryPath,
+                sessionId: session.sessionId
+            )
+        }
+
+        return process.terminationStatus
     }
 
     private func verifyTrustedPath(
@@ -216,5 +326,26 @@ public struct BrokerService {
         mergedDetails["command"] = .string(command)
         mergedDetails["originalErrorCode"] = .string(originalError.errorOutput.error.code)
         return .logging(message, mergedDetails)
+    }
+
+    private func ensureOneshotCompliance(mode: ExecMode, request: ExecRequest) throws {
+        guard mode == .oneshot else {
+            return
+        }
+        let forbidden = ["--watch", "--daemon", "--serve", "--background"]
+        let offending = request.arguments.first { arg in
+            let lower = arg.lowercased()
+            return forbidden.contains(where: { lower.contains($0) })
+        }
+        if let offender = offending {
+            throw LatchkeydError.usage("Oneshot mode rejects the argument `\(offender)` because it indicates a long-lived run.")
+        }
+    }
+
+    private func effectiveMode(for policy: ExecPolicy, policyName: String) -> ExecMode {
+        if policy.mode != .handoff {
+            return policy.mode
+        }
+        return manifest.executionMode(forPolicy: policyName) == .oneshot ? .oneshot : .handoff
     }
 }
