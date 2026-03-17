@@ -1,18 +1,21 @@
 # Demo Asset Generation
 
-`latchkeyd` keeps its terminal demo stills as generated browser-rendered assets instead of manually maintained screenshots.
+`latchkeyd` keeps its promoted visual assets as tracked image files so the README, docs, and share surfaces stay consistent.
 
-Current generated assets:
+Current terminal stills:
 
-- `terminal-happy-path.webp`
-- `terminal-denial.webp`
+- `terminal-brokered-demo.png`
+- `terminal-brokered-denial.png`
 
 Current supporting assets:
 
-- `before-after-anim.webp`
+- `hero-before-after-trust-modes.png`
+- `diagram-execution-modes.png`
 - `attack-surface-anim.webp`
 - `architecture-flow.png`
-- `share-card.svg`
+- `share-card-trust-modes.png`
+- `share-card-creator-qr.png`
+- `qr-code.png`
 
 ## Regenerate
 
@@ -55,9 +58,11 @@ Use descriptive alt text for promoted assets.
 
 Recommended starting points:
 
-- `before-after-anim.webp`: `Animated before-and-after showing broad local credential exposure replaced by explicit trust-mode selection and trust-mediated execution.`
+- `hero-before-after-trust-modes.png`: `Before-and-after visual showing broad local credential exposure replaced by explicit trust-mode selection and trust-mediated execution.`
+- `diagram-execution-modes.png`: `Diagram showing handoff, oneshot, brokered, ephemeral, and proxy execution modes with what the child receives and what the broker still controls.`
 - `attack-surface-anim.webp`: `Animation showing how a local trust broker narrows prompt-injection fallout by verifying wrapper and binary before credential-backed access.`
 - `architecture-flow.png`: `Architecture diagram showing wrapper, local trust broker, trusted binary, and local secret backend flow.`
-- `terminal-happy-path.webp`: `Terminal still showing a successful trusted handoff through latchkeyd.`
-- `terminal-denial.webp`: `Terminal still showing a trust denial before the secret is released.`
-- `share-card.svg`: `Share card for latchkeyd, a macOS local trust broker with explicit trust modes.`
+- `terminal-brokered-demo.png`: `Terminal still showing a successful brokered request through latchkeyd.`
+- `terminal-brokered-denial.png`: `Terminal still showing a denied brokered operation before secret access is returned.`
+- `share-card-trust-modes.png`: `Share card for latchkeyd, a macOS local trust broker with explicit trust modes.`
+- `share-card-creator-qr.png`: `Creator card for latchkeyd with maintainer attribution and a small bottom-right QR code.`

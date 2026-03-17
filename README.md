@@ -11,7 +11,7 @@
 
 > If you use local coding agents with real credentials, `latchkeyd` gives you a narrower, evidence-backed trust boundary between wrapper and tool.
 
-![latchkeyd before and after](docs/assets/before-after-anim.webp)
+![latchkeyd before and after](docs/assets/hero-before-after-trust-modes.png)
 
 ```bash
 LATCHKEYD_BIN="$PWD/.build/debug/latchkeyd" ./examples/bin/example-wrapper brokered-demo
@@ -52,23 +52,25 @@ This is the main product shift:
 - from explicit handoff before execution
 - to explicit, user-chosen trust posture per task
 
+![Modes Diagram](docs/assets/diagram-execution-modes.png)
+
 ## See It In Action
 
-### Approved Handoff
+### Approved Brokered Request
 
 Build, initialize trust, run the wrapper, validate the workstation:
 
-![Happy path terminal](docs/assets/terminal-happy-path.webp)
+![Happy path terminal](docs/assets/terminal-brokered-demo.png)
 
-This demonstrates the classic `handoff` path: wrapper and binary are verified, one approved env var is injected, and the tool proves it received access without printing the raw secret.
+This demonstrates the shipped brokered path: wrapper and binary are verified, the child starts with session metadata only, and one approved brokered request succeeds.
 
-### Denied Handoff
+### Denied Brokered Request
 
-Put the wrong binary in `PATH` and the broker rejects it instead of handing over the secret:
+Ask for an operation that is not approved and the broker rejects it inside the active session:
 
-![Trust denial terminal](docs/assets/terminal-denial.webp)
+![Trust denial terminal](docs/assets/terminal-brokered-denial.png)
 
-This demonstrates the fail-closed trust story: a name match is not trust, and no secret is released when the binary path or hash is wrong.
+This demonstrates the fail-closed brokered story: a running trusted child still does not get arbitrary broker access, and no secret value is returned for an unapproved operation.
 
 More walkthroughs:
 

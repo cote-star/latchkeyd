@@ -69,7 +69,7 @@ Current repo scope includes:
 2. Mechanism:
    wrapper -> local trust broker -> trusted tool, with explicit mode choice.
 3. Proof:
-   hero asset, trusted handoff demo, denied handoff demo, brokered request demo.
+   hero asset, trust modes diagram, brokered request demo, denied brokered request demo.
 4. Limits:
    not a sandbox, not same-user compromise protection, not universal prompt-injection prevention.
 5. Close:
