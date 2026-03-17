@@ -2,7 +2,7 @@
 
 ![CI Status](https://github.com/cote-star/latchkeyd/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-0.1.0--alpha-green.svg)
+![Version](https://img.shields.io/badge/version-0.1.0--alpha.3-green.svg)
 [![Star History](https://img.shields.io/github/stars/cote-star/latchkeyd?style=social)](https://github.com/cote-star/latchkeyd)
 
 **Keep secrets local. Approve the handoff.**
@@ -50,7 +50,9 @@ More walkthroughs:
 
 ## What You Get Back
 
-Every broker command returns structured output that is safe to inspect, script, or log:
+The manifest, status, validate, and error flows emit structured JSON that is safe to inspect, script, or log; `exec` delegations inherit stdout/stderr from the trusted child, so review child output before relying on its format.
+
+Event logging is part of the enforced audit contract for brokered operations: `latchkeyd` preflights the event log path before `exec` and `validate`, and it returns `LOGGING_ERROR` if audit logging is unavailable up front or fails while recording the outcome.
 
 ```json
 {
@@ -61,7 +63,7 @@ Every broker command returns structured output that is safe to inspect, script, 
 }
 ```
 
-Trusted wrapper, trusted binary, scoped handoff. No raw secret values printed back to the terminal.
+Trusted wrapper, trusted binary, scoped handoff. The reference demo CLI avoids printing raw secrets, but a trusted child process controls what appears on the terminal, so keep wrapper logic intentional.
 
 ## Quick Start
 
@@ -137,7 +139,7 @@ If the safety story depends on a cloud broker, remote policy service, or hosted 
 - the handoff policy is local
 - the operator can inspect the actual trusted paths and hashes
 
-That makes the system easier to reason about for a single-user workstation and reduces reliance on cloud-side assumptions.
+That makes the system easier to reason about for a single-user macOS workstation and reduces reliance on cloud-side assumptions. Offline operation is supported because every run reads local manifest/event files and negotiates with local binaries; no external service is consulted, and the dedicated `scripts/offline_smoke.sh` proves that happy-path commands run with every proxy pointing at invalid endpoints.
 
 ## How This Helps With Prompt-Injection Fallout
 
@@ -202,10 +204,14 @@ The secure path should be the shortest path, but it should never silently self-h
 | **Wrapper trust-pinning** | Yes | No | Varies |
 | **Binary trust-pinning** | Yes | No | Varies |
 | **Fail-closed on drift** | Yes | No | Policy-dependent |
-| **Works offline** | Yes | Yes | No |
+| **Works offline** | Yes (`scripts/offline_smoke.sh` proves the core happy path) | Yes | No |
 | **Local operator can inspect trust root** | Yes | Partial | No |
 
 ## Public Command Surface
+
+GitHub Actions CI and release workflows exist in the repository, but they are not re-run locally as part of this review. The hosted workflows are still the signal that gates every public release candidate, so run them on the release branch/tag before announcing the alpha.
+
+The core build, test, validate, and packaging steps can be mirrored locally with `scripts/local_workflow_parity.sh`, and the offline smoke proof in `scripts/offline_smoke.sh` keeps every proxy pointing to invalid addresses to prove `manifest init`, `refresh`, `verify`, wrapper demo, and `validate` succeed without network dependencies.
 
 - `latchkeyd status`
 - `latchkeyd manifest init`
@@ -222,18 +228,22 @@ Default event log path:
 
 - `~/Library/Application Support/latchkeyd/events.jsonl`
 
+`exec` and `validate` preflight this file before they begin brokered work, and manifest lifecycle commands also return `LOGGING_ERROR` if the audit log cannot be created or appended. Fix the log path before retrying instead of accepting an unaudited run.
+
 Use `--manifest PATH` to override the manifest location.
 
 ## Current Alpha Scope
 
 Current alpha scope:
 
-- SwiftPM package with a real `latchkeyd` CLI
-- manifest init, refresh, verify, and validate commands
+- macOS-only SwiftPM package with a real `latchkeyd` CLI
+- manifest init, refresh, verify, exec, and validate commands
 - `file` and `keychain` secret backends
 - a reference Bash wrapper plus a harmless demo CLI
-- JSONL event logging
-- GitHub Actions CI and release workflows
+- JSONL event logging with enforced audit preflight and `LOGGING_ERROR` failures
+- `scripts/offline_smoke.sh` for dedicated offline proof
+- `scripts/local_workflow_parity.sh` for local release-prep parity
+- GitHub Actions CI and release workflows (hosted runs still required before cutting a public tag)
 
 Intentional non-goals for this alpha:
 
@@ -281,6 +291,8 @@ Later possibilities:
 - Homebrew distribution
 - signed and notarized binaries
 - broader wrapper ecosystem
+
+Release candidates must run `scripts/local_workflow_parity.sh` and `scripts/offline_smoke.sh` locally to prove the full command surface before cutting a tag, but the hosted GitHub release workflow is still the authoritative gate for every public asset.
 
 ## Project Support
 

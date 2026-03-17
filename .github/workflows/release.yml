@@ -25,6 +25,9 @@ jobs:
       - name: Init manifest
         run: .build/release/latchkeyd manifest init --force
 
+      - name: Refresh manifest
+        run: .build/release/latchkeyd manifest refresh
+
       - name: Verify manifest
         run: .build/release/latchkeyd manifest verify
 

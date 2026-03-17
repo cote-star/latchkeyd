@@ -32,7 +32,7 @@ public struct CLI {
 
             case .manifestInit(let force):
                 let manifest = try manifestStore.initialize(force: force)
-                logger.log(command: "manifest.init", result: "ok", backendType: manifest.backend.type)
+                try logger.log(command: "manifest.init", result: "ok", backendType: manifest.backend.type)
                 let output = CommandOutput(
                     ok: true,
                     command: "manifest.init",
@@ -47,7 +47,7 @@ public struct CLI {
 
             case .manifestRefresh:
                 let manifest = try manifestStore.refresh()
-                logger.log(command: "manifest.refresh", result: "ok", backendType: manifest.backend.type)
+                try logger.log(command: "manifest.refresh", result: "ok", backendType: manifest.backend.type)
                 let output = CommandOutput(
                     ok: true,
                     command: "manifest.refresh",
@@ -64,7 +64,7 @@ public struct CLI {
             case .manifestVerify:
                 let items = try manifestStore.verify()
                 let manifest = try manifestStore.load()
-                logger.log(command: "manifest.verify", result: "ok", backendType: manifest.backend.type)
+                try logger.log(command: "manifest.verify", result: "ok", backendType: manifest.backend.type)
                 let output = CommandOutput(
                     ok: true,
                     command: "manifest.verify",
@@ -162,14 +162,17 @@ public struct ParsedCommand {
             var callerPath: String?
             var execArguments: [String] = []
             var iterator = remaining.makeIterator()
-            while let argument = iterator.next() {
+            execParsing: while let argument = iterator.next() {
                 switch argument {
                 case "--policy":
                     policyName = iterator.next()
                 case "--caller":
                     callerPath = iterator.next()
                 case "--":
-                    execArguments = Array(iterator)
+                    while let trailing = iterator.next() {
+                        execArguments.append(trailing)
+                    }
+                    break execParsing
                 default:
                     throw LatchkeydError.usage("Unknown exec argument `\(argument)`.\n\n\(usageText())")
                 }
